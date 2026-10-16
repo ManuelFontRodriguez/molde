@@ -52,7 +52,8 @@ It works without an agent too: it is an ordinary command-line tool, and the repo
 plain JSON for CI, a script or a person. molde runs on your machine and sends nothing
 anywhere: no telemetry, no update checks, no account.
 
-(molde is Spanish and Portuguese for "mould". It is not related to the `mold` linker.)
+(molde is Spanish and Portuguese for a mould or template, the kind you pour something into. It is
+not related to the `mold` linker.)
 
 ## Install
 
@@ -276,7 +277,7 @@ format and the check report are the supported surface, and the
 [compatibility section](docs/reference.md#compatibility) says what may change between
 versions. The Rust library API is not stable yet.
 
-## License
+## Licence
 
 Licensed under either of
 

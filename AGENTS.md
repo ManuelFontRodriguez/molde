@@ -44,7 +44,8 @@ request titles and descriptions follow [docs/git-conventions.md](docs/git-conven
 
 ## Working rules
 
-- English in code, comments, file names and docs.
+- English in code, comments, file names and docs, with British spelling in prose (licence,
+  behaviour, colour). Code, identifiers and quoted standard texts keep their own spelling.
 - One pull request per item; the maintainer merges.
 - Ask first before anything that cannot be undone or is public: deleting branches,
   rewriting history, force-pushing, tagging or publishing a release.

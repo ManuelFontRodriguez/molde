@@ -184,7 +184,7 @@ Table additions to the std_head block:
 This section is kept for the reasoning behind the constraints. The multilingual design
 itself is in [i18n.md](i18n.md); build from that, not from this.
 
-Constraints to honor:
+Constraints to honour:
 
 1. **Opt-in or nonexistent.** No `locales:` key in site.yaml → there is no locale
    dimension: no prefixes, no `t()`, no hreflang, resolver is identity. Single-language

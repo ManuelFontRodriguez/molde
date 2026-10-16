@@ -45,7 +45,7 @@ refactor(serve): bound the settle loop against continuously-changing files
 | `chore`    | Dependency updates, tooling, configs — dep bumps are always `chore(deps)` |
 | `docs`     | Documentation only                           |
 | `style`    | Formatting, whitespace (no logic change)     |
-| `refactor` | Code restructuring (no behavior change)      |
+| `refactor` | Code restructuring (no behaviour change)     |
 | `perf`     | Performance improvement                      |
 | `build`    | Build system config (Cargo profile, packaging) — NOT dep bumps |
 | `revert`   | Reverting a previous commit                  |
@@ -106,7 +106,7 @@ the mechanics.
 - How this was verified: commands run (`cargo fmt --check`,
   `cargo clippy --all-targets -- -D warnings`, `cargo test`), or manual
   steps a reviewer can reproduce
-- Behavior changes to serve/events: how the live loop was exercised
+- Behaviour changes to serve/events: how the live loop was exercised
 - If no automated tests: say so — "No automated tests; manual
   verification: <steps>"
 
