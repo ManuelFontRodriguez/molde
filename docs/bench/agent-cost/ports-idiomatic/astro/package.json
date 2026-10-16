@@ -1,0 +1,11 @@
+{
+  "name": "bench-astro-idiomatic",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "astro build" },
+  "dependencies": {
+    "astro": "7.3.8",
+    "@astrojs/sitemap": "3.7.4"
+  }
+}

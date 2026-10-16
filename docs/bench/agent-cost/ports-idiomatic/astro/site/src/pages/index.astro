@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { cycleId, stocks, stockPath } from '../data/stocks';
+---
+
+<BaseLayout title="Demo — dividend stocks">
+  <h1>Stocks (cycle {cycleId})</h1>
+  <ul>
+    {
+      stocks.map((stock) => (
+        <li>
+          <a href={stockPath(stock)}>{stock.name}</a> — {stock.sector}
+        </li>
+      ))
+    }
+  </ul>
+</BaseLayout>

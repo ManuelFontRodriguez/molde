@@ -1,0 +1,16 @@
+{
+ "run_id": "20261016T173251Z-molde-check-T3-P1-r1-2a1fe8",
+ "arm": "molde-check",
+ "task": "T3",
+ "prompt": "P1",
+ "rep": 1,
+ "model": "claude-opus-5-5",
+ "effort": "high",
+ "max_turns": 100,
+ "set": "smoke",
+ "dry_run": false,
+ "agent_exit": 0,
+ "agent_wall_s": 31.7,
+ "proxy_refused": [],
+ "token_scrubbed_files": []
+}

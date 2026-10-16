@@ -1,0 +1,161 @@
+{
+ "task": "T0",
+ "port": "idiomatic-hugo",
+ "build": {
+  "ok": true,
+  "log": "Start building sites … \nhugo v0.168.0-e27a6760c5547237f87d353aebe0580feadb20f4+extended linux/arm64 BuildDate=2026-10-13T16:42:50Z VendorInfo=gohugoio\n\n\n                  │ EN \n──────────────────┼────\n Pages            │  7 \n Paginator pages  │  0 \n Non-page files   │  0 \n Static files     │  1 \n Processed images │  0 \n Aliases          │  0 \n Cleaned          │  0 \n\nTotal in 6 ms\n"
+ },
+ "data_file": "data/stocks.json",
+ "integrity": [],
+ "oracle": {
+  "pass": true,
+  "stated": {
+   "R1_build": {
+    "ok": true,
+    "problems": []
+   },
+   "R2_links": {
+    "ok": true,
+    "problems": []
+   },
+   "R3_sitemap": {
+    "ok": true,
+    "problems": []
+   },
+   "R4_titles": {
+    "ok": true,
+    "problems": []
+   },
+   "R5_canonical_og": {
+    "ok": true,
+    "problems": []
+   },
+   "R6_escaping": {
+    "ok": true,
+    "problems": []
+   },
+   "R7_jsonld": {
+    "ok": true,
+    "problems": []
+   },
+   "R8_data": {
+    "ok": true,
+    "problems": []
+   },
+   "R9_robots": {
+    "ok": true,
+    "problems": []
+   }
+  },
+  "task": {
+   "ok": true,
+   "problems": []
+  },
+  "unstated": {
+   "notes": []
+  },
+  "pages": [
+   "/",
+   "/stocks/KO/",
+   "/stocks/PEP/",
+   "/stocks/SAN/",
+   "/stocks/T/"
+  ]
+ },
+ "mutation": {
+  "build_ok": true,
+  "log": "Start building sites … \nhugo v0.168.0-e27a6760c5547237f87d353aebe0580feadb20f4+extended linux/arm64 BuildDate=2026-10-13T16:42:50Z VendorInfo=gohugoio\n\n\n                  │ EN \n──────────────────┼────\n Pages            │  9 \n Paginator pages  │  0 \n Non-page files   │  0 \n Static files     │  1 \n Processed images │  0 \n Aliases          │  0 \n Cleaned          │  0 \n\nTotal in 6 ms\n",
+  "oracle": {
+   "pass": true,
+   "stated": {
+    "R1_build": {
+     "ok": true,
+     "problems": []
+    },
+    "R2_links": {
+     "ok": true,
+     "problems": []
+    },
+    "R3_sitemap": {
+     "ok": true,
+     "problems": []
+    },
+    "R4_titles": {
+     "ok": true,
+     "problems": []
+    },
+    "R5_canonical_og": {
+     "ok": true,
+     "problems": []
+    },
+    "R6_escaping": {
+     "ok": true,
+     "problems": []
+    },
+    "R7_jsonld": {
+     "ok": true,
+     "problems": []
+    },
+    "R8_data": {
+     "ok": true,
+     "problems": []
+    },
+    "R9_robots": {
+     "ok": true,
+     "problems": []
+    }
+   },
+   "task": {
+    "ok": true,
+    "problems": []
+   },
+   "unstated": {
+    "notes": []
+   },
+   "pages": [
+    "/",
+    "/stocks/A1/",
+    "/stocks/KO/",
+    "/stocks/PEP/",
+    "/stocks/SAN/",
+    "/stocks/T/",
+    "/stocks/ZZZ/"
+   ]
+  }
+ },
+ "browser": null,
+ "lychee": {
+  "exit": 0,
+  "report": {
+   "total": 18,
+   "unique": 11,
+   "successful": 18,
+   "unknown": 0,
+   "unsupported": 0,
+   "timeouts": 0,
+   "redirects": 0,
+   "remaps": 5,
+   "excludes": 0,
+   "errors": 0,
+   "cached": 0,
+   "success_map": {},
+   "error_map": {},
+   "timeout_map": {},
+   "suggestion_map": {},
+   "redirect_map": {},
+   "excluded_map": {},
+   "duration": {
+    "secs": 0,
+    "nanos": 567791
+   },
+   "detailed_stats": false
+  }
+ },
+ "second_judge": {
+  "lychee_broken_links": false,
+  "oracle_broken_links": false,
+  "agree": true,
+  "note": "lychee checks href/src (and remapped absolute URLs); it does not read CSS url() or srcset, so oracle-only failures of those kinds are expected disagreements"
+ },
+ "pass": true
+}

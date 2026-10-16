@@ -1,0 +1,7 @@
+node_modules/
+out/
+.next/
+.judge-out/
+public/
+resources/
+.hugo_build.lock

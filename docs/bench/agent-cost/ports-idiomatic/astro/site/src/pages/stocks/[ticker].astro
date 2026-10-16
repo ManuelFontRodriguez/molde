@@ -1,0 +1,35 @@
+---
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { stocks, type Stock } from '../../data/stocks';
+
+export const getStaticPaths = (() =>
+  stocks.map((stock) => ({
+    params: { ticker: stock.ticker },
+    props: { stock },
+  }))) satisfies GetStaticPaths;
+
+interface Props {
+  stock: Stock;
+}
+
+const { stock } = Astro.props;
+const { upcoming } = stock;
+---
+
+<BaseLayout title={`${stock.name} (${stock.ticker})`}>
+  <h1>{stock.name} <small>({stock.ticker})</small></h1>
+  <p>Sector: {stock.sector}</p>
+  {
+    upcoming ? (
+      <p class:list={['upcoming', { estimated: !upcoming.confirmed }]}>
+        Next dividend: {upcoming.amount} {upcoming.currency} — ex {upcoming.ex_date}
+        {!upcoming.confirmed && ' '}
+        {!upcoming.confirmed && <span class="badge">Estimated — not yet declared</span>}
+      </p>
+    ) : (
+      <p>No upcoming dividend declared.</p>
+    )
+  }
+  <p><a href="/">← All stocks</a></p>
+</BaseLayout>
