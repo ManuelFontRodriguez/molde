@@ -337,4 +337,4 @@ names where it lives.
 | R11 | **Compile time.** A 350 KB generated file, or ICU4X's crate graph, slows every clean build. | minor | Measured at +0.2 s for the table vs +9 s for ICU4X (§4). The file is plain statics: no macros, no const-eval. |
 | R12 | **Grouping by default breaks existing pages.** Turning grouping on by default changes `1234,5` on sites already built. | blocker | Verbatim mode keeps the original default. Grouping defaults on only with `decimals=` (§3). |
 | R13 | **Non-Gregorian defaults.** fa and th: whose output is right, ICU-through-PHP's or CLDR's Gregorian? | minor | CLDR Gregorian. It is documented and the goldens pin the divergence (§8). |
-| R14 | **Licence.** Shipping CLDR data in a binary without its licence. | minor | Unicode License v3 is in `src/i18n/LICENSE-UNICODE`, next to the data (§4). |
+| R14 | **License.** Shipping CLDR data in a binary without its license. | minor | Unicode License v3 is in `src/i18n/LICENSE-UNICODE`, next to the data (§4). |

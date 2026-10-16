@@ -277,7 +277,7 @@ format and the check report are the supported surface, and the
 [compatibility section](docs/reference.md#compatibility) says what may change between
 versions. The Rust library API is not stable yet.
 
-## Licence
+## License
 
 Licensed under either of
 
