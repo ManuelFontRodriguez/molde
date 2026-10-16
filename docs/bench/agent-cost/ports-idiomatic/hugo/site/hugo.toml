@@ -1,0 +1,9 @@
+baseURL = 'https://demo.example/'
+locale = 'en'
+title = 'Demo — dividend stocks'
+
+# Stock URLs use the ticker exactly as written in the data (/stocks/KO/).
+disablePathToLower = true
+
+disableKinds = ['rss', 'taxonomy', 'term']
+enableRobotsTXT = true

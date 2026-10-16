@@ -1,0 +1,161 @@
+{
+ "task": "T3",
+ "port": "molde",
+ "build": {
+  "ok": true,
+  "log": "built 5 pages (+1 assets) in 1 ms -> .judge-out/builds/1792172004841280500\n"
+ },
+ "data_file": "data.json",
+ "integrity": [],
+ "oracle": {
+  "pass": true,
+  "stated": {
+   "R1_build": {
+    "ok": true,
+    "problems": []
+   },
+   "R2_links": {
+    "ok": true,
+    "problems": []
+   },
+   "R3_sitemap": {
+    "ok": true,
+    "problems": []
+   },
+   "R4_titles": {
+    "ok": true,
+    "problems": []
+   },
+   "R5_canonical_og": {
+    "ok": true,
+    "problems": []
+   },
+   "R6_escaping": {
+    "ok": true,
+    "problems": []
+   },
+   "R7_jsonld": {
+    "ok": true,
+    "problems": []
+   },
+   "R8_data": {
+    "ok": true,
+    "problems": []
+   },
+   "R9_robots": {
+    "ok": true,
+    "problems": []
+   }
+  },
+  "task": {
+   "ok": true,
+   "problems": []
+  },
+  "unstated": {
+   "notes": []
+  },
+  "pages": [
+   "/",
+   "/acciones/KO/",
+   "/acciones/PEP/",
+   "/acciones/SAN/",
+   "/acciones/T/"
+  ]
+ },
+ "mutation": {
+  "build_ok": true,
+  "log": "built 7 pages (+1 assets) in 1 ms -> .judge-out/builds/1792172004845303500\n",
+  "oracle": {
+   "pass": true,
+   "stated": {
+    "R1_build": {
+     "ok": true,
+     "problems": []
+    },
+    "R2_links": {
+     "ok": true,
+     "problems": []
+    },
+    "R3_sitemap": {
+     "ok": true,
+     "problems": []
+    },
+    "R4_titles": {
+     "ok": true,
+     "problems": []
+    },
+    "R5_canonical_og": {
+     "ok": true,
+     "problems": []
+    },
+    "R6_escaping": {
+     "ok": true,
+     "problems": []
+    },
+    "R7_jsonld": {
+     "ok": true,
+     "problems": []
+    },
+    "R8_data": {
+     "ok": true,
+     "problems": []
+    },
+    "R9_robots": {
+     "ok": true,
+     "problems": []
+    }
+   },
+   "task": {
+    "ok": true,
+    "problems": []
+   },
+   "unstated": {
+    "notes": []
+   },
+   "pages": [
+    "/",
+    "/acciones/A1/",
+    "/acciones/KO/",
+    "/acciones/PEP/",
+    "/acciones/SAN/",
+    "/acciones/T/",
+    "/acciones/ZZZ/"
+   ]
+  }
+ },
+ "browser": null,
+ "lychee": {
+  "exit": 0,
+  "report": {
+   "total": 18,
+   "unique": 11,
+   "successful": 18,
+   "unknown": 0,
+   "unsupported": 0,
+   "timeouts": 0,
+   "redirects": 0,
+   "remaps": 5,
+   "excludes": 0,
+   "errors": 0,
+   "cached": 0,
+   "success_map": {},
+   "error_map": {},
+   "timeout_map": {},
+   "suggestion_map": {},
+   "redirect_map": {},
+   "excluded_map": {},
+   "duration": {
+    "secs": 0,
+    "nanos": 808041
+   },
+   "detailed_stats": false
+  }
+ },
+ "second_judge": {
+  "lychee_broken_links": false,
+  "oracle_broken_links": false,
+  "agree": true,
+  "note": "lychee checks href/src (and remapped absolute URLs); it does not read CSS url() or srcset, so oracle-only failures of those kinds are expected disagreements"
+ },
+ "pass": true
+}

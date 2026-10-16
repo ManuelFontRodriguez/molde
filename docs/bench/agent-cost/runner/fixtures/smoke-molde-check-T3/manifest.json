@@ -1,0 +1,14 @@
+{
+ "arm": "molde-check",
+ "port": "molde",
+ "task": "T3",
+ "prompt": "P1",
+ "planted": [],
+ "files": {
+  "arm.md": "e0080d138a75fc3e263b6a2244a814570ec70f8c8d00c8be9cb68957c8d4d63e",
+  "bin/molde": "f1303f1124929b25675529cf9feee45e630889d7147b8ca39e154591dbe8f034",
+  "molde-reference.md": "74814195c0c721572f0228c76b8805739d4ce561247fe6d94c50668b4c5d9b14",
+  "prompt.txt": "da248299bb6e60d28b8cb65b9429a37b3e800ce5da27791c027e3335ba7a4ae3"
+ },
+ "workspace_commit": "b9a616ab7aea9034a3bab79e42e573ade078103d"
+}

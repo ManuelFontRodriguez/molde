@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""site-check: standalone checker for a BUILT static site (benchmark "+checker" arms).
+
+Usage: site-check <build-output-dir> [--base https://demo.example]
+
+This is the benchmark's standalone checker, given to the "+checker" arms. It looks only
+at the built output and checks requirements 2-7 and 9 of requirements.md:
+
+  2 links.internal          every href/src/srcset/poster/action, and every CSS url() /
+                            @import (in .css files, <style> blocks and style="" attributes),
+                            written absolute (to --base) or relative, points to a file
+  3 sitemap.*               /sitemap.xml lists the URL of every page once, nothing else
+                            (sitemap.missing, .missing_page, .dangling, .duplicate, .invalid)
+  4 titles.*                exactly one non-empty <title> per page, unique (missing,
+                            multiple, duplicate)
+  5 canonical.*, og.*       one canonical and one og:url equal to the page URL, og:title
+                            equal to the title (canonical.missing/.multiple/.mismatch,
+                            og.missing/.multiple/.url_mismatch/.title_mismatch)
+  6 escaping.double         entity debris (&amp; &lt; &#39; ...) left in the rendered text
+  7 jsonld.invalid          an application/ld+json block that does not parse
+  9 robots.missing, robots.sitemap   robots.txt exists and has "Sitemap: <base>/sitemap.xml"
+
+Pages are the .html files except 404.html, 404/index.html and anything under a top-level
+folder whose name starts with "_". a/b/index.html is the URL /a/b/; x.html is /x.html.
+
+Requirements 1 (build succeeds) and 8 (data-driven) cannot be judged from output; they are
+listed under "not_checked". Output: one JSON object on stdout, modelled on `molde check`:
+{"verdict", "errors": [{"check", "page", ..., "hint"}], "not_checked", "pages"}.
+Every problem is reported. Exit code: 0 pass, 1 fail, 2 usage error.
+"""
+import json
+import os
+import re
+import sys
+import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
+from urllib.parse import unquote, urljoin, urlsplit
+
+DEFAULT_BASE = "https://demo.example"
+NOT_CHECKED = [
+    {"requirement": 1, "reason": "build success needs the build command, not its output"},
+    {"requirement": 8, "reason": "data-driven pages need a changed data.json and a rebuild"},
+]
+URL_ATTRS = ("href", "src", "poster", "action", "xlink:href", "data")
+SKIP_SCHEMES = ("mailto", "tel", "javascript", "data", "sms", "blob", "about")
+DEBRIS = re.compile(r"&(?:amp|lt|gt|quot|apos|nbsp|#\d+|#[xX][0-9a-fA-F]+);")
+CSS_URL = re.compile(r"""url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s"'][^)]*?))\s*\)""", re.I)
+CSS_IMPORT = re.compile(r"""@import\s+(?:"([^"]*)"|'([^']*)')""", re.I)
+
+
+class Page(HTMLParser):
+    """Collects what the checks need from one HTML file."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.refs = []        # (attr or css kind, raw value)
+        self.titles = []
+        self.canon = []
+        self.og = {}          # property -> [contents]
+        self.ldjson = []
+        self.text = []        # rendered text chunks (no script/style)
+        self.base_href = None
+        self._stack = []      # open script/style/title tag being read
+        self._buf = []
+        self._ld = False
+
+    def handle_starttag(self, tag, attrs):
+        a = {k.lower(): (v if v is not None else "") for k, v in attrs}
+        for k in URL_ATTRS:
+            if k in a and (k != "data" or tag == "object"):
+                self.refs.append((k, a[k]))
+        for k in ("srcset", "imagesrcset"):
+            if k in a:
+                for cand in re.split(r",\s+|,$", a[k].strip()):
+                    if cand.strip():
+                        self.refs.append(("srcset", cand.split()[0]))
+        if "style" in a:
+            self.refs += css_refs(a["style"])
+        if tag == "base" and "href" in a and self.base_href is None:
+            self.base_href = a["href"]
+        if tag == "link" and "canonical" in a.get("rel", "").lower().split():
+            self.canon.append(a.get("href", ""))
+        if tag == "meta":
+            prop = (a.get("property") or a.get("name") or "").lower()
+            if prop.startswith("og:"):
+                self.og.setdefault(prop, []).append(a.get("content", ""))
+            if a.get("content"):
+                self.text.append(a["content"])
+        if tag in ("script", "style", "title"):
+            self._stack.append(tag)
+            self._buf = []
+            self._ld = tag == "script" and a.get("type", "").split(";")[0].strip().lower() == "application/ld+json"
+
+    def handle_endtag(self, tag):
+        if self._stack and self._stack[-1] == tag:
+            self._stack.pop()
+            body = "".join(self._buf)
+            if tag == "title":
+                self.titles.append(body)
+                self.text.append(body)
+            elif tag == "style":
+                self.refs += css_refs(body)
+            elif self._ld:
+                self.ldjson.append(body)
+            self._ld = False
+            self._buf = []
+
+    def handle_data(self, data):
+        if self._stack:
+            self._buf.append(data)
+        else:
+            self.text.append(data)
+
+
+def css_refs(css):
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    out = [("css url()", next(g for g in m.groups() if g is not None)) for m in CSS_URL.finditer(css)]
+    out += [("css @import", next(g for g in m.groups() if g is not None)) for m in CSS_IMPORT.finditer(css)]
+    return out
+
+
+def read(path):
+    with open(path, "rb") as f:
+        return f.read().decode("utf-8", errors="replace")
+
+
+def collect(root):
+    files, pages = set(), []
+    for d, dirs, names in os.walk(root):
+        dirs.sort()
+        for n in sorted(names):
+            rel = os.path.relpath(os.path.join(d, n), root).replace(os.sep, "/")
+            files.add(rel)
+            top = rel.split("/")[0]
+            if (rel.endswith(".html") and rel not in ("404.html", "404/index.html")
+                    and not (("/" in rel) and top.startswith("_"))):
+                pages.append(rel)
+    return files, sorted(pages)
+
+
+def page_url(base, rel):
+    if rel == "index.html":
+        return base + "/"
+    if rel.endswith("/index.html"):
+        return base + "/" + rel[: -len("index.html")]
+    return base + "/" + rel
+
+
+def main(argv):
+    args, base = [], DEFAULT_BASE
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--base" and i + 1 < len(argv):
+            base = argv[i + 1].rstrip("/")
+            i += 2
+        elif argv[i].startswith("-"):
+            return usage()
+        else:
+            args.append(argv[i])
+            i += 1
+    if len(args) != 1 or not os.path.isdir(args[0]):
+        return usage()
+    root = args[0]
+    host = urlsplit(base).netloc.lower()
+    files, pages = collect(root)
+    errors = []
+
+    def err(check, page, hint, **kw):
+        errors.append({"check": check, "page": page, **kw, "hint": hint})
+
+    def target_exists(path):
+        rel = unquote(path).lstrip("/")
+        if rel == "" or rel.endswith("/"):
+            return rel + "index.html" in files
+        return rel in files or rel + "/index.html" in files
+
+    def check_ref(owner, attr, raw, doc_url):
+        raw = raw.strip()
+        if not raw or raw.startswith("#"):
+            return
+        u = urlsplit(urljoin(doc_url, raw))
+        if u.scheme in SKIP_SCHEMES or u.scheme not in ("http", "https"):
+            return
+        if u.netloc.lower() != host:
+            return
+        if not target_exists(u.path or "/"):
+            err("links.internal", owner, "create the file, or fix the link so it points to a file in the build output",
+                url=raw, source=attr, resolved=u.path)
+
+    # requirement 2: pages, then every .css file
+    parsed = {}
+    for rel in pages:
+        p = Page()
+        p.feed(read(os.path.join(root, rel)))
+        p.close()
+        parsed[rel] = p
+        url = page_url(base, rel)
+        doc = urljoin(url, p.base_href) if p.base_href else url
+        for attr, raw in p.refs:
+            check_ref(url_path(url, base), attr, raw, doc)
+    for rel in sorted(f for f in files if f.endswith(".css")):
+        cssurl = base + "/" + rel
+        for attr, raw in css_refs(read(os.path.join(root, rel))):
+            check_ref(rel, attr, raw, cssurl)
+
+    # requirement 3: sitemap
+    urls = {rel: page_url(base, rel) for rel in pages}
+    if "sitemap.xml" not in files:
+        err("sitemap.missing", "sitemap.xml", "generate /sitemap.xml listing every page")
+    else:
+        try:
+            tree = ET.fromstring(read(os.path.join(root, "sitemap.xml")))
+            locs = [(e.text or "").strip() for e in tree.iter() if e.tag.split("}")[-1] == "loc"]
+        except ET.ParseError as e:
+            locs = None
+            err("sitemap.invalid", "sitemap.xml", "make sitemap.xml well-formed XML", error=str(e))
+        if locs is not None:
+            seen = set()
+            for loc in locs:
+                if loc in seen:
+                    err("sitemap.duplicate", "sitemap.xml", "list each page once", url=loc)
+                seen.add(loc)
+            want = set(urls.values())
+            for loc in sorted(seen - want):
+                err("sitemap.dangling", "sitemap.xml", "remove URLs that are not pages of the site", url=loc)
+            for rel in pages:
+                if urls[rel] not in seen:
+                    err("sitemap.missing_page", url_path(urls[rel], base), "add this page's full URL to sitemap.xml",
+                        expected=urls[rel])
+
+    # requirements 4-7, per page
+    first_title = {}
+    for rel in pages:
+        p, url = parsed[rel], urls[rel]
+        page = url_path(url, base)
+        titles = [re.sub(r"\s+", " ", t).strip() for t in p.titles]
+        if len(titles) > 1:
+            err("titles.multiple", page, "keep exactly one <title> per page", count=len(titles))
+        if not titles or not titles[0]:
+            err("titles.missing", page, "give the page a non-empty <title>")
+        else:
+            if titles[0] in first_title:
+                err("titles.duplicate", page, "make the title unique, e.g. include the page's own name",
+                    title=titles[0], duplicate_of=first_title[titles[0]])
+            else:
+                first_title[titles[0]] = page
+        # canonical
+        if not p.canon:
+            err("canonical.missing", page, 'add <link rel="canonical"> with the full page URL', expected=url)
+        elif len(p.canon) > 1:
+            err("canonical.multiple", page, "keep a single canonical link", found=p.canon)
+        elif p.canon[0].strip() != url:
+            err("canonical.mismatch", page, "set the canonical to the page's own full URL", expected=url, found=p.canon[0])
+        # og:url / og:title
+        ogu = p.og.get("og:url", [])
+        if not ogu:
+            err("og.missing", page, 'add <meta property="og:url"> with the full page URL', property="og:url", expected=url)
+        elif len(ogu) > 1:
+            err("og.multiple", page, "keep a single og:url", property="og:url", found=ogu)
+        elif ogu[0].strip() != url:
+            err("og.url_mismatch", page, "set og:url to the page's own full URL", expected=url, found=ogu[0])
+        ogt = p.og.get("og:title", [])
+        want_t = titles[0] if titles else ""
+        if not ogt:
+            err("og.missing", page, 'add <meta property="og:title"> equal to the title', property="og:title", expected=want_t)
+        elif len(ogt) > 1:
+            err("og.multiple", page, "keep a single og:title", property="og:title", found=ogt)
+        elif re.sub(r"\s+", " ", ogt[0]).strip() != want_t:
+            err("og.title_mismatch", page, "make og:title equal to the <title>", expected=want_t, found=ogt[0])
+        # escaping
+        text = " ".join(p.text)
+        hits = sorted(set(DEBRIS.findall(text)))
+        if hits:
+            m = DEBRIS.search(text)
+            snippet = text[max(0, m.start() - 20): m.end() + 20].strip()
+            err("escaping.double", page, "escape data once: drop the extra escaping or mark already-escaped text safe",
+                found=hits, context=snippet)
+        # json-ld
+        for n, block in enumerate(p.ldjson, 1):
+            try:
+                json.loads(block)
+            except ValueError as e:
+                err("jsonld.invalid", page, "fix the JSON-LD so it is valid JSON (quotes, commas, escaping)",
+                    block=n, error=str(e))
+
+    # requirement 9: robots
+    if "robots.txt" not in files:
+        err("robots.missing", "robots.txt", "add /robots.txt with a Sitemap line")
+    else:
+        lines = [l.strip() for l in read(os.path.join(root, "robots.txt")).splitlines()]
+        sm = [l.split(":", 1)[1].strip() for l in lines if l.lower().startswith("sitemap:")]
+        if base + "/sitemap.xml" not in sm:
+            err("robots.sitemap", "robots.txt", "add the line 'Sitemap: %s/sitemap.xml'" % base,
+                expected=base + "/sitemap.xml", found=sm)
+
+    print(json.dumps({"verdict": "fail" if errors else "pass", "errors": errors,
+                      "not_checked": NOT_CHECKED, "pages": len(pages)}, indent=2, ensure_ascii=False))
+    return 1 if errors else 0
+
+
+def url_path(url, base):
+    return url[len(base):] or "/"
+
+
+def usage():
+    sys.stderr.write("usage: site-check <build-output-dir> [--base https://demo.example]\n")
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

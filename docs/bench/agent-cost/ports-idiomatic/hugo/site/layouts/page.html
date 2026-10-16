@@ -1,0 +1,13 @@
+{{ define "main" }}
+  <h1>{{ .Params.name }} <small>({{ .Params.ticker }})</small></h1>
+  <p>Sector: {{ .Params.sector }}</p>
+  {{ with .Params.upcoming }}
+    <p class="upcoming{{ if not .confirmed }} estimated{{ end }}">
+      Next dividend: {{ .amount }} {{ .currency }} — ex {{ .ex_date }}
+      {{ if not .confirmed }}<span class="badge">Estimated — not yet declared</span>{{ end }}
+    </p>
+  {{ else }}
+    <p>No upcoming dividend declared.</p>
+  {{ end }}
+  <p><a href="{{ site.Home.RelPermalink }}">← All stocks</a></p>
+{{ end }}

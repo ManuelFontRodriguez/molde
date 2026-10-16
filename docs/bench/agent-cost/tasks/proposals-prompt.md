@@ -1,0 +1,1 @@
+List the five most common changes that the owner of a small data-driven listing website asks for. The site is static: it is generated from a JSON file of items, with one page per item and an index page listing them. Write one line per change, specific enough to implement. No preamble, no explanation: just the five numbered lines.

@@ -1,0 +1,10 @@
+{{ define "main" }}
+  <h1>Stocks (cycle {{ hugo.Data.stocks.cycle_id }})</h1>
+  {{ with site.GetPage "/stocks" }}
+    <ul>
+      {{ range .Pages }}
+        <li><a href="{{ .RelPermalink }}">{{ .Params.name }}</a> — {{ .Params.sector }}</li>
+      {{ end }}
+    </ul>
+  {{ end }}
+{{ end }}

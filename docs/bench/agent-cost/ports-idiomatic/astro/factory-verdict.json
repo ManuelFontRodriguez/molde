@@ -1,0 +1,161 @@
+{
+ "task": "T0",
+ "port": "idiomatic-astro",
+ "build": {
+  "ok": true,
+  "log": ""
+ },
+ "data_file": "src/data/stocks.json",
+ "integrity": [],
+ "oracle": {
+  "pass": true,
+  "stated": {
+   "R1_build": {
+    "ok": true,
+    "problems": []
+   },
+   "R2_links": {
+    "ok": true,
+    "problems": []
+   },
+   "R3_sitemap": {
+    "ok": true,
+    "problems": []
+   },
+   "R4_titles": {
+    "ok": true,
+    "problems": []
+   },
+   "R5_canonical_og": {
+    "ok": true,
+    "problems": []
+   },
+   "R6_escaping": {
+    "ok": true,
+    "problems": []
+   },
+   "R7_jsonld": {
+    "ok": true,
+    "problems": []
+   },
+   "R8_data": {
+    "ok": true,
+    "problems": []
+   },
+   "R9_robots": {
+    "ok": true,
+    "problems": []
+   }
+  },
+  "task": {
+   "ok": true,
+   "problems": []
+  },
+  "unstated": {
+   "notes": []
+  },
+  "pages": [
+   "/",
+   "/stocks/KO/",
+   "/stocks/PEP/",
+   "/stocks/SAN/",
+   "/stocks/T/"
+  ]
+ },
+ "mutation": {
+  "build_ok": true,
+  "log": "",
+  "oracle": {
+   "pass": true,
+   "stated": {
+    "R1_build": {
+     "ok": true,
+     "problems": []
+    },
+    "R2_links": {
+     "ok": true,
+     "problems": []
+    },
+    "R3_sitemap": {
+     "ok": true,
+     "problems": []
+    },
+    "R4_titles": {
+     "ok": true,
+     "problems": []
+    },
+    "R5_canonical_og": {
+     "ok": true,
+     "problems": []
+    },
+    "R6_escaping": {
+     "ok": true,
+     "problems": []
+    },
+    "R7_jsonld": {
+     "ok": true,
+     "problems": []
+    },
+    "R8_data": {
+     "ok": true,
+     "problems": []
+    },
+    "R9_robots": {
+     "ok": true,
+     "problems": []
+    }
+   },
+   "task": {
+    "ok": true,
+    "problems": []
+   },
+   "unstated": {
+    "notes": []
+   },
+   "pages": [
+    "/",
+    "/stocks/A1/",
+    "/stocks/KO/",
+    "/stocks/PEP/",
+    "/stocks/SAN/",
+    "/stocks/T/",
+    "/stocks/ZZZ/"
+   ]
+  }
+ },
+ "browser": null,
+ "lychee": {
+  "exit": 0,
+  "report": {
+   "total": 18,
+   "unique": 11,
+   "successful": 18,
+   "unknown": 0,
+   "unsupported": 0,
+   "timeouts": 0,
+   "redirects": 0,
+   "remaps": 5,
+   "excludes": 0,
+   "errors": 0,
+   "cached": 0,
+   "success_map": {},
+   "error_map": {},
+   "timeout_map": {},
+   "suggestion_map": {},
+   "redirect_map": {},
+   "excluded_map": {},
+   "duration": {
+    "secs": 0,
+    "nanos": 529625
+   },
+   "detailed_stats": false
+  }
+ },
+ "second_judge": {
+  "lychee_broken_links": false,
+  "oracle_broken_links": false,
+  "agree": true,
+  "note": "lychee checks href/src (and remapped absolute URLs); it does not read CSS url() or srcset, so oracle-only failures of those kinds are expected disagreements"
+ },
+ "pass": true
+}

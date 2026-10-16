@@ -1,0 +1,15 @@
+{{- range $i, $stock := hugo.Data.stocks.stocks }}
+  {{- $.AddPage (dict
+    "path" $stock.ticker
+    "slug" $stock.ticker
+    "title" (printf "%s (%s)" $stock.name $stock.ticker)
+    "weight" (add $i 1)
+    "sitemap" (dict "priority" -1)
+    "params" (dict
+      "name" $stock.name
+      "ticker" $stock.ticker
+      "sector" $stock.sector
+      "upcoming" $stock.upcoming
+    )
+  ) }}
+{{- end }}

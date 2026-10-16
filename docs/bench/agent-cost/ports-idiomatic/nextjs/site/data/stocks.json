@@ -1,0 +1,13 @@
+{
+  "cycle_id": "2026-09-18T09:00:00Z-demo",
+  "stocks": [
+    { "ticker": "KO",  "name": "Coca-Cola Co",    "sector": "Consumer Defensive",
+      "upcoming": { "ex_date": "2026-09-29", "amount": "0.5100", "currency": "USD", "confirmed": true } },
+    { "ticker": "PEP", "name": "PepsiCo Inc",     "sector": "Consumer Defensive",
+      "upcoming": { "ex_date": "2026-10-02", "amount": "1.3550", "currency": "USD", "confirmed": false } },
+    { "ticker": "SAN", "name": "Banco Santander", "sector": "Financial Services",
+      "upcoming": null },
+    { "ticker": "T",   "name": "AT&T Inc",        "sector": "Communication Services",
+      "upcoming": { "ex_date": "2026-10-09", "amount": "0.2775", "currency": "USD", "confirmed": true } }
+  ]
+}
