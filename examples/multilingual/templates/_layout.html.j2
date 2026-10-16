@@ -1,0 +1,24 @@
+{% import "_util.html.j2" as u %}
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/style.css">
+{{ std_head }}
+{% block head %}{% endblock %}
+</head>
+<body>
+<nav aria-label="{{ t('nav.label') }}">
+  <a href="{{ u.prefix(locale) }}/">{{ t('nav.home') }}</a> ·
+  <a href="{{ u.list_path(locale) }}">{{ t('nav.all') }}</a>
+  {% if alternates %}
+  <span class="languages">{{ t('nav.languages') }}:
+    {% for a in alternates if a.locale != locale %}<a href="{{ a.path }}" hreflang="{{ a.locale }}" lang="{{ a.locale }}">{{ {"en": "English", "es": "Español", "de": "Deutsch"}[a.locale] }}</a> {% endfor %}
+  </span>
+  {% endif %}
+</nav>
+<main>
+{% block main %}{% endblock %}
+</main>
+</body>
+</html>

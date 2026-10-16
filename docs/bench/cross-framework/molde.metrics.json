@@ -1,0 +1,20 @@
+{
+  "framework": "molde",
+  "version": "0.1.0-rc.1",
+  "install_seconds": 0,
+  "deps_disk_mb": 5,
+  "dep_count": 51,
+  "files_authored": 4,
+  "loc_authored": 44,
+  "build_ms_small": 7,
+  "build_ms_big": 170,
+  "fidelity_raw_diff": 0,
+  "fidelity_normalized_diff": 0,
+  "irreducible_residue": "none — golden IS molde output",
+  "features_manual": [],
+  "conformance_checks": "built-in: links, titles, sitemap coverage, canonical/OG head, JSON-LD, size budgets, locale checks; publish gated on pass",
+  "notes": "Control. Measured from a 0.1.0-rc.1 development build (`cargo build --release --locked`, cold build about 32 s). The timed build includes .html.gz precompression at gzip's maximum level for every page, absent from all other frameworks; pages are rendered and compressed on every core, and files are created at most four at a time, the fastest setting measured on this file system. install=0 as a prebuilt single binary. `molde check` (render, every conformance check, gated publish) is a separate command: 477 ms on 1,901 pages, 9.7 ms on 5.",
+  "check_ms_big": 477,
+  "check_ms_small": 10,
+  "runs_per_cell": 11
+}

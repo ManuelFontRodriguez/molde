@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+{{ std_head }}
+</head>
+<body>
+<h1>Stocks (cycle {{ data.cycle_id }})</h1>
+<ul>
+{% for s in data.stocks %}
+  <li><a href="/stocks/{{ s.ticker }}/">{{ s.name }}</a> — {{ s.sector }}</li>
+{% endfor %}
+</ul>
+</body>
+</html>

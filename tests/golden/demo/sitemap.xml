@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://demo.example/</loc><lastmod>2026-09-18</lastmod></url>
+  <url><loc>https://demo.example/books/dune/</loc><lastmod>2026-09-18</lastmod></url>
+  <url><loc>https://demo.example/books/pride-and-prejudice/</loc><lastmod>2026-09-17</lastmod></url>
+  <url><loc>https://demo.example/books/the-left-hand-of-darkness/</loc><lastmod>2026-09-12</lastmod></url>
+  <url><loc>https://demo.example/books/a-brief-history-of-time/</loc><lastmod>2026-09-18</lastmod></url>
+  <url><loc>https://demo.example/genres/science-fiction/</loc></url>
+  <url><loc>https://demo.example/genres/classic-fiction/</loc></url>
+  <url><loc>https://demo.example/genres/popular-science/</loc></url>
+</urlset>

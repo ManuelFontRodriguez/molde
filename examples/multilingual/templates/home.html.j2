@@ -1,0 +1,13 @@
+{% extends "_layout.html.j2" %}
+{% import "_util.html.j2" as u %}
+{% block main %}
+<h1>{{ t('home.title') }}</h1>
+<p>{{ t('home.intro', count=u.count(data.cities, locale)) }}</p>
+{{ u.city_list(data.cities, locale) }}
+<h2>{{ t('home.countries') }}</h2>
+<ul>
+{% for country in data.cities | map(attribute='country') | unique %}
+  <li><a href="{{ u.country_path(country, locale) }}">{{ t('country.' ~ (country | slug)) }}</a></li>
+{% endfor %}
+</ul>
+{% endblock %}

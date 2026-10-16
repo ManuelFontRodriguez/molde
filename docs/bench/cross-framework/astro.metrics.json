@@ -1,0 +1,23 @@
+{
+  "framework": "Astro",
+  "version": "7.3.8",
+  "install_seconds": 1.1,
+  "deps_disk_mb": 167,
+  "dep_count": 286,
+  "files_authored": 4,
+  "loc_authored": 94,
+  "build_ms_small": 559,
+  "build_ms_big": 965,
+  "fidelity_raw_diff": 0,
+  "fidelity_normalized_diff": 0,
+  "irreducible_residue": "None. With compressHTML:false (default is true, which would have mangled the target's whitespace) Astro injected nothing: no comments, no attributes, no scripts, no generator meta. All 6 files are byte-identical to golden, including the missing trailing newline at EOF (Astro trims the template's final newline, which happened to match).",
+  "features_manual": [
+    "sitemap.xml (hand-written as a src/pages/sitemap.xml.js endpoint; @astrojs/sitemap was rejected without trying a build: it emits xhtml namespace, changefreq/priority-capable single-line format and orders by route, so exact byte parity with the golden's 2-space-indented <url><loc> lines was implausible)",
+    "canonical + og:title/og:url/og:type head tags (no framework head/SEO API in core; typed by hand per template)",
+    "loop whitespace of the reference generator (blank lines between <li> items and the two-space line where the skipped badge branch was) \u2014 Astro's {array.map()} concatenates nodes with no separators, so the list items and the upcoming-dividend section were built as strings in frontmatter and injected via <Fragment set:html>, including manual &-escaping for the string-built parts",
+    "pretty-URL/trailing-slash convention (build.format 'directory' config, plus hand-built URLs in canonical/og/sitemap)"
+  ],
+  "conformance_checks": "None. Astro validates that getStaticPaths covers requested params and that routes don't collide, but nothing verifies internal links, titles, canonical URLs, or sitemap coverage; a typo'd href or a stock missing from the sitemap builds green.",
+  "notes": "Fidelity was surprisingly cheap: byte-identical on the first build attempt. Two config bits carry all the weight: compressHTML:false and build.format:'directory'. Escaping matched golden exactly where Astro's renderer was used ({expr} text and attributes both emit AT&amp;T); the only hand-escaping needed was inside the set:html strings I built to replicate the reference generator's loop whitespace. Non-HTML files are trivial: a .js file in src/pages returning a Response gives full byte control over sitemap.xml. Friction: none functional, but 167 MB / 286 packages of node_modules and a ~630 ms floor of Vite startup for a 6-file site is heavy machinery; the big build shows per-page cost is tiny (~0.2 ms/page: 1901 pages added only ~390 ms over the fixed overhead). The set:html workaround means part of the markup lives in JS template strings rather than the template proper, which is the one place the golden's shape (Jinja-style block scars) fought Astro's JSX-style rendering model.",
+  "runs_per_cell": 11
+}

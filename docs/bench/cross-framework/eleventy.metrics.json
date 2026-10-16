@@ -1,0 +1,24 @@
+{
+  "framework": "Eleventy (11ty)",
+  "version": "3.1.6",
+  "install_seconds": 0.45,
+  "deps_disk_mb": 22,
+  "dep_count": 130,
+  "files_authored": 3,
+  "loc_authored": 69,
+  "build_ms_small": 288,
+  "build_ms_big": 781,
+  "fidelity_raw_diff": 0,
+  "fidelity_normalized_diff": 0,
+  "irreducible_residue": "None. Eleventy emits exactly what the templates render: no injected scripts, comments, attributes, or forced trailing newlines. Byte-identical output (verified with diff -r) was achievable, including files ending without a newline.",
+  "features_manual": [
+    "sitemap.xml (hand-written Nunjucks template looping over the data; Eleventy has no built-in sitemap; declared as a virtual template in eleventy.config.js)",
+    "all head tags: <title>, canonical, og:title/og:url/og:type (hand-written per template; no metadata/SEO system)",
+    "absolute URL construction (https://demo.example prefix hard-coded; no built-in site-URL concept)",
+    "permalink scheme for pretty URLs (explicit permalink front matter on the paginated template)",
+    "whitespace choreography to match golden bytes (untrimmed {% for %}/{% if %} tags happened to reproduce the golden's blank lines and the '  ' empty-badge line exactly)"
+  ],
+  "conformance_checks": "None. Eleventy does not validate links, titles, canonical URLs, or sitemaps; it will silently build whatever the templates render. Any conformance checking would be a third-party plugin or external tooling.",
+  "notes": "Extremely low-friction for this data-driven shape. Dropping data.json into _data/ made it global data with zero config; pagination (data: data.stocks, size: 1, alias: s) plus a templated permalink produced one pretty-URL page per stock; sitemap was a 8-line njk file with permalink: /sitemap.xml. Sitemap and robots.txt are Eleventy 3 virtual templates declared in a 21-line eleventy.config.js (which also passes style.css through). Nunjucks autoescape handled AT&T -> AT&amp;T in both text and attributes. Nunjucks' default non-trimming block tags exactly reproduced the golden's loop blank lines and trailing-space residue, suggesting the reference framework also uses an untrimmed Jinja-like engine. Cost side: 130 transitive npm packages / 22 MB for a job this small, ~330 ms of fixed startup overhead per build (5-stock build 333 ms, 1901 pages only 868 ms, i.e. throughput is fine, startup dominates small builds). Install was 0.5 s with a warm npm cache (npm ci).",
+  "runs_per_cell": 11
+}

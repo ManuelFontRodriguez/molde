@@ -1,0 +1,11 @@
+{{/* Content adapter: one page per stock from data/stocks.json (copy of demo-site/data.json). */}}
+{{ range hugo.Data.stocks.stocks }}
+  {{ $page := dict
+    "path" .ticker
+    "url" (printf "/stocks/%s/" .ticker)
+    "kind" "page"
+    "title" (printf "%s (%s)" .name .ticker)
+    "params" (dict "stock" .)
+  }}
+  {{ $.AddPage $page }}
+{{ end }}

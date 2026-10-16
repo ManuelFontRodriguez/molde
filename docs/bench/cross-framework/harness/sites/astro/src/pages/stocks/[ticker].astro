@@ -1,0 +1,41 @@
+---
+import data from '../../data/data.json';
+
+export function getStaticPaths() {
+  return data.stocks.map((s) => ({ params: { ticker: s.ticker }, props: { stock: s } }));
+}
+
+const { stock } = Astro.props;
+const title = `${stock.name} (${stock.ticker})`;
+const url = `https://demo.example/stocks/${stock.ticker}/`;
+
+// The golden <section> block carries load-bearing whitespace: when the
+// dividend is confirmed, the badge line is literally "  " (two spaces).
+// Built as a string + set:html so Astro's conditional rendering can't trim it.
+const u = stock.upcoming;
+const upcoming = u
+  ? `<section class="upcoming${u.confirmed ? '' : ' estimated'}">\n` +
+    `  <p>Next dividend: ${u.amount} ${u.currency} — ex ${u.ex_date}</p>\n` +
+    `  ${u.confirmed ? '' : '<p class="badge">Estimated — not yet declared</p>'}\n` +
+    `</section>`
+  : `<p>No upcoming dividend declared.</p>`;
+---
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+<title>{title}</title>
+<link rel="canonical" href={url}>
+<meta property="og:title" content={title}>
+<meta property="og:url" content={url}>
+<meta property="og:type" content="website">
+</head>
+<body>
+<h1>{stock.name} <small>{stock.ticker}</small></h1>
+<p>{stock.sector}</p>
+
+<Fragment set:html={upcoming} />
+
+<p><a href="/">← all stocks</a></p>
+</body>
+</html>

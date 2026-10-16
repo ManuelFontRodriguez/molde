@@ -1,0 +1,19 @@
+{# Links between pages. A template can't ask molde for another page's path, so these
+   macros spell the paths out: they must mirror routes.yaml (the folder names per locale)
+   and site.yaml (the default locale, en, lives at the root; the others under /es/ and
+   /de/). Change one and change the other: links.internal fails the check if they drift.
+   A page's own language versions need no macro: use `alternates`, as _layout does. #}
+{% macro prefix(locale) %}{{ '' if locale == 'en' else '/' ~ locale }}{% endmacro %}
+{% macro city_path(c, locale) %}{{ prefix(locale) }}{{ {"en": "/cities/", "es": "/ciudades/", "de": "/staedte/"}[locale] }}{{ c.slug[locale] }}/{% endmacro %}
+{% macro country_path(country, locale) %}{{ prefix(locale) }}{{ {"en": "/countries/", "es": "/paises/", "de": "/laender/"}[locale] }}{{ country | slug }}/{% endmacro %}
+{% macro list_path(locale) %}{{ prefix(locale) }}{{ {"en": "/cities/", "es": "/ciudades/", "de": "/staedte/"}[locale] }}{% endmacro %}
+
+{% macro count(cities, locale) %}{% set n = namespace(c=0) %}{% for c in cities if c.name[locale] %}{% set n.c = n.c + 1 %}{% endfor %}{{ n.c }}{% endmacro %}
+
+{% macro city_list(cities, locale) %}
+<ul class="cities">
+{% for c in cities if c.name[locale] %}
+  <li><a href="{{ city_path(c, locale) }}">{{ c.name | loc }}</a> — {{ c.population | num_format(grouping=true) }}</li>
+{% endfor %}
+</ul>
+{% endmacro %}

@@ -1,0 +1,16 @@
+name: Feature or change
+description: Something molde should do, check, or explain differently.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to do and where molde stopped short. A real site or template helps most.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: Optional. If it is a new capability, which check should ship with it?

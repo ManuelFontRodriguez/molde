@@ -1,0 +1,29 @@
+name: Bug report
+description: molde did something wrong, crashed, or a check failed a correct site.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got instead (the check report, or the error).
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Smallest site that shows it
+      description: The routes.yaml, data.json and template(s) that reproduce it, ideally a handful of lines each.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: molde --version
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: macOS 15 arm64 / Ubuntu 24.04 x86-64

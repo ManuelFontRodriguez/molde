@@ -1,0 +1,14 @@
+{
+  "name": "site",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "eleventy"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Eleventy byte-parity benchmark port of molde-vs golden target",
+  "dependencies": {
+    "@11ty/eleventy": "3.1.6"
+  }
+}

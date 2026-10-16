@@ -1,0 +1,36 @@
+# cargo-deny policy, run in CI (`cargo deny check`). https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# The platforms molde is built for; crates only other targets pull in are not judged.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+]
+
+[licenses]
+# Permissive licences only: everything here lets molde ship under any licence.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSL-1.0",
+  "0BSD",
+  "Unlicense",
+  "Zlib",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.9
+
+[advisories]
+# A crate whose maintainer marked it unmaintained is reported, not fatal: replacing
+# one is a planned change (serde_yaml), not an emergency.
+unmaintained = "workspace"
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

@@ -1,0 +1,28 @@
+site:
+  name: Städteführer
+home:
+  countries: Nach Land
+  title: Städteführer
+  description: "Städte mit Einwohnerzahl und Geschichte, nach Land."
+  intro: "Ein kleiner Führer zu {count} Städten. Wähle eine aus oder stöbere nach Land."
+city:
+  description: "{name}, {country}: Einwohnerzahl und Geschichte."
+  population: Einwohner
+  founded: Gegründet
+  country: Land
+country:
+  description: "Städte in {country}."
+  portugal: Portugal
+  spain: Spanien
+  cote-d-ivoire: Elfenbeinküste
+list:
+  title: Alle Städte
+  page: "Seite {n}"
+  previous: Zurück
+  next: Weiter
+nav:
+  label: Website
+  pages: Seiten
+  home: Startseite
+  all: Alle Städte
+  languages: Diese Seite auf

@@ -1,0 +1,6 @@
+body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+nav { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.9rem; }
+.languages { margin-left: auto; }
+dt { font-weight: 600; }
+dd { margin: 0 0 0.5rem; }
+.pager { margin-top: 1rem; }

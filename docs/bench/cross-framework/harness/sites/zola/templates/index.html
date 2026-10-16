@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+<title>{{ section.title }}</title>
+<link rel="canonical" href="{{ section.permalink | safe }}">
+<meta property="og:title" content="{{ section.title }}">
+<meta property="og:url" content="{{ section.permalink | safe }}">
+<meta property="og:type" content="website">
+</head>
+<body>
+{% set data = load_data(path="data.json") -%}
+<h1>Stocks (cycle {{ data.cycle_id }})</h1>
+<ul>
+{% for s in data.stocks %}
+  <li><a href="/stocks/{{ s.ticker }}/">{{ s.name }}</a> — {{ s.sector }}</li>
+{% endfor %}
+</ul>
+</body>
+</html>

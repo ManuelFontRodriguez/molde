@@ -1,0 +1,23 @@
+{
+  "framework": "hugo",
+  "version": "0.168.0",
+  "install_seconds": 1.41,
+  "deps_disk_mb": 86,
+  "dep_count": 1,
+  "files_authored": 7,
+  "loc_authored": 74,
+  "build_ms_small": 50,
+  "build_ms_big": 302,
+  "fidelity_raw_diff": 0,
+  "fidelity_normalized_diff": 0,
+  "irreducible_residue": "None. Hugo's only default injection (<meta name=\"generator\"> in the home <head>) is disabled via disableHugoGeneratorInject = true; with taxonomy/term/rss/section kinds disabled and no theme, output is byte-identical to golden including trailing whitespace and missing final newlines.",
+  "features_manual": [
+    "entire HTML head (title/canonical/og:*) \u2014 Hugo has no default head, every tag is authored",
+    "sitemap.xml template \u2014 Hugo's built-in sitemap emits xhtml namespace + changefreq/priority and its own ordering, so a custom layouts/sitemap.xml was required (including the safeHTML workaround for the <?xml ?> declaration)",
+    "page generation from data.json \u2014 via a content adapter (content/stocks/_content.gotmpl) calling .AddPage per stock; also had to pass an explicit \"url\" per page because content-adapter logical paths are lowercased even with disablePathToLower = true",
+    "disabling default outputs: taxonomies, terms, RSS, and the /stocks/ section list page (disableKinds) to avoid extra output files"
+  ],
+  "conformance_checks": "None. Hugo does not verify links, titles, or sitemap contents; it only errors on template/parse failures. (hugo --printPathWarnings exists for path clashes; no content validation.)",
+  "notes": "HTML auto-escaping handled AT&T -> AT&amp;T for free in text, <title>, and attributes. Biggest surprises: (1) Hugo silently injects a generator meta tag into the home page head (disableHugoGeneratorInject fixes it); (2) content-adapter paths are force-lowercased regardless of disablePathToLower, requiring an explicit url key; (3) XML templates run through html/template so the leading <?xml?> must be piped through safeHTML; (4) .Site.Data was deprecated mid-2025 in favor of hugo.Data. Go template whitespace semantics reproduced the golden's incidental blank lines and trailing spaces exactly with zero effort. Install is `brew install hugo`: one 86 MB binary (extended + withdeploy build), no other deps. Big build: 1901 pages in ~0.28 s on one process; the ~59 ms small-site time is mostly process startup.",
+  "runs_per_cell": 11
+}

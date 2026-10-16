@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://guide.example/</loc><lastmod>2026-09-20</lastmod></url>
+  <url><loc>https://guide.example/es/</loc><lastmod>2026-09-20</lastmod></url>
+  <url><loc>https://guide.example/de/</loc><lastmod>2026-09-20</lastmod></url>
+  <url><loc>https://guide.example/cities/lisbon/</loc><lastmod>2026-09-14</lastmod></url>
+  <url><loc>https://guide.example/cities/porto/</loc><lastmod>2026-09-02</lastmod></url>
+  <url><loc>https://guide.example/cities/seville/</loc><lastmod>2026-09-20</lastmod></url>
+  <url><loc>https://guide.example/cities/valencia/</loc><lastmod>2026-08-30</lastmod></url>
+  <url><loc>https://guide.example/cities/abidjan/</loc><lastmod>2026-09-11</lastmod></url>
+  <url><loc>https://guide.example/es/ciudades/lisboa/</loc><lastmod>2026-09-14</lastmod></url>
+  <url><loc>https://guide.example/es/ciudades/oporto/</loc><lastmod>2026-09-02</lastmod></url>
+  <url><loc>https://guide.example/es/ciudades/sevilla/</loc><lastmod>2026-09-20</lastmod></url>
+  <url><loc>https://guide.example/es/ciudades/valencia/</loc><lastmod>2026-08-30</lastmod></url>
+  <url><loc>https://guide.example/es/ciudades/abiyan/</loc><lastmod>2026-09-11</lastmod></url>
+  <url><loc>https://guide.example/de/staedte/lissabon/</loc><lastmod>2026-09-14</lastmod></url>
+  <url><loc>https://guide.example/de/staedte/porto/</loc><lastmod>2026-09-02</lastmod></url>
+  <url><loc>https://guide.example/de/staedte/sevilla/</loc><lastmod>2026-09-20</lastmod></url>
+  <url><loc>https://guide.example/de/staedte/abidjan/</loc><lastmod>2026-09-11</lastmod></url>
+  <url><loc>https://guide.example/countries/portugal/</loc></url>
+  <url><loc>https://guide.example/countries/spain/</loc></url>
+  <url><loc>https://guide.example/countries/cote-d-ivoire/</loc></url>
+  <url><loc>https://guide.example/es/paises/portugal/</loc></url>
+  <url><loc>https://guide.example/es/paises/spain/</loc></url>
+  <url><loc>https://guide.example/es/paises/cote-d-ivoire/</loc></url>
+  <url><loc>https://guide.example/de/laender/portugal/</loc></url>
+  <url><loc>https://guide.example/de/laender/spain/</loc></url>
+  <url><loc>https://guide.example/de/laender/cote-d-ivoire/</loc></url>
+  <url><loc>https://guide.example/cities/</loc></url>
+  <url><loc>https://guide.example/cities/page/2/</loc></url>
+  <url><loc>https://guide.example/cities/page/3/</loc></url>
+  <url><loc>https://guide.example/es/ciudades/</loc></url>
+  <url><loc>https://guide.example/es/ciudades/pagina/2/</loc></url>
+  <url><loc>https://guide.example/es/ciudades/pagina/3/</loc></url>
+  <url><loc>https://guide.example/de/staedte/</loc></url>
+  <url><loc>https://guide.example/de/staedte/seite/2/</loc></url>
+</urlset>

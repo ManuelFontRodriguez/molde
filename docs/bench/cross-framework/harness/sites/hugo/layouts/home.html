@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+<title>{{ .Title }}</title>
+<link rel="canonical" href="{{ .Permalink }}">
+<meta property="og:title" content="{{ .Title }}">
+<meta property="og:url" content="{{ .Permalink }}">
+<meta property="og:type" content="website">
+</head>
+<body>
+<h1>Stocks (cycle {{ hugo.Data.stocks.cycle_id }})</h1>
+<ul>
+{{ range hugo.Data.stocks.stocks }}
+  <li><a href="/stocks/{{ .ticker }}/">{{ .name }}</a> — {{ .sector }}</li>
+{{ end }}
+</ul>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+{{ std_head }}
+</head>
+<body>
+<h1>{{ item.genre }}</h1>
+<ul>
+{% for b in item.items %}
+  <li><a href="/books/{{ b.id }}/">{{ b.title }}</a> — {{ b.author }}</li>
+{% endfor %}
+</ul>
+<p><a href="/">← all books</a></p>
+</body>
+</html>

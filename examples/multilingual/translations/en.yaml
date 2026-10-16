@@ -1,0 +1,28 @@
+site:
+  name: City guide
+home:
+  countries: By country
+  title: City guide
+  description: "Cities with their population and history, by country."
+  intro: "A small guide to {count} cities. Pick one, or browse them by country."
+city:
+  description: "{name}, {country}: population and history."
+  population: Population
+  founded: Founded
+  country: Country
+country:
+  description: "Cities in {country}."
+  portugal: Portugal
+  spain: Spain
+  cote-d-ivoire: Côte d'Ivoire
+list:
+  title: All cities
+  page: "page {n}"
+  previous: Previous
+  next: Next
+nav:
+  label: Site
+  pages: Pages
+  home: Home
+  all: All cities
+  languages: Read this page in

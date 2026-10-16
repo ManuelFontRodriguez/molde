@@ -1,0 +1,137 @@
+name: release
+
+# A tag `v*` builds the binaries, checksums them and drafts nothing: it publishes
+# a GitHub release with the archives attached (a pre-release when the tag has a
+# `-`, such as v0.1.0-rc.1). A pull request that touches this file runs the same
+# builds without releasing, so the pipeline is tested before a tag needs it.
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths: [".github/workflows/release.yml", "about.toml", "about.hbs"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Before five minutes of builds: on a tag, the tag must name the Cargo.toml version
+  # and a commit already on main.
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - if: startsWith(github.ref, 'refs/tags/v')
+        name: The tag matches Cargo.toml and is on main
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, Cargo.toml $version"; exit 1; }
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "$GITHUB_SHA is not on main"; exit 1; }
+
+  # Every check, macOS and the oldest supported Rust included, before anything is built.
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: [verify, checks]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux binaries are static (musl): they run on any distribution, old glibc or none.
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # An exact version, not `stable`: the same tag builds the same binary next month.
+      # Raise it on purpose (and run the tests with it) when a release wants a newer Rust.
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: "1.98.1"
+          targets: ${{ matrix.target }}
+      - if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Third-party licence notices
+        run: |
+          cargo install cargo-about --locked --features cli --version 0.9.2
+          cargo about generate --locked --target ${{ matrix.target }} about.hbs > THIRD-PARTY-NOTICES.md
+      - name: Archive and checksum
+        shell: bash
+        run: |
+          name="molde-${GITHUB_REF_NAME#v}-${{ matrix.target }}"
+          [[ "$GITHUB_REF" == refs/tags/* ]] || name="molde-pr-${{ matrix.target }}"
+          mkdir "$name"
+          cp "target/${{ matrix.target }}/release/molde" README.md THIRD-PARTY-NOTICES.md \
+             src/i18n/LICENSE-UNICODE "$name"/
+          if ls LICENSE* >/dev/null 2>&1; then cp LICENSE* "$name"/; fi
+          "$name/molde" --version
+          tar -czf "$name.tar.gz" "$name"
+          shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
+          cat "$name.tar.gz.sha256"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.target }}
+          path: molde-*.tar.gz*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Combined checksums
+        run: cd dist && cat ./*.sha256 > SHA256SUMS && rm ./*.sha256 && cat SHA256SUMS
+      # The release notes are the version's CHANGELOG.md section, when it has one.
+      - name: Release notes
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v v="$version" '
+            /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md 2>/dev/null > notes.md || true
+          wc -l notes.md
+      # Build provenance (who built which archive from which commit). GitHub offers it
+      # for public repositories, so it switches on by itself once molde is public.
+      - if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.tar.gz
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=(--title "$GITHUB_REF_NAME" --verify-tag)
+          if [ -s notes.md ]; then flags+=(--notes-file notes.md); else flags+=(--generate-notes); fi
+          [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" "${flags[@]}" dist/*.tar.gz dist/SHA256SUMS

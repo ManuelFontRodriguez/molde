@@ -1,0 +1,24 @@
+{
+  "framework": "Next.js (pages router, output: 'export', unstable_runtimeJS: false)",
+  "version": "16.4.0",
+  "install_seconds": 2.01,
+  "deps_disk_mb": 337,
+  "dep_count": 54,
+  "files_authored": 7,
+  "loc_authored": 156,
+  "build_ms_small": 1361,
+  "build_ms_big": 2181,
+  "fidelity_raw_diff": 75,
+  "fidelity_normalized_diff": 75,
+  "irreducible_residue": "260 B/page uniform: single-line minification (no pretty-print option), data-next-head markers on all head tags, forced viewport meta, noscript data-n-css stub, __next hydration root, charSet/self-closing normalization; plus forced 404.html + 404/index.html and 14 dead JS chunks (~430 KB) in _next/ with zero client code",
+  "features_manual": [
+    "sitemap.xml: hand-written generator script (scripts/prebuild.js) run before next build; pages router has no sitemap support, and the app-router sitemap.js convention emits a different pretty-printed multi-line format than the target",
+    "canonical + og:title/og:url/og:type: assembled by hand with next/head on every page (the app router Metadata API exists but forces app router's much heavier script/RSC-payload residue)",
+    "title pattern '{name} ({ticker})': manual string template",
+    "pretty-URL knowledge duplicated: href/canonical/sitemap URLs all hand-built as strings; trailingSlash: true only affects file layout",
+    "whitespace fidelity: explicit {'\\n'} / {'\\n  '} text nodes in JSX because React renders with zero formatting"
+  ],
+  "conformance_checks": "None. Next validates that getStaticPaths covers requested params (fallback: false errors on unknown paths at export) and fails the build on JSX/type errors, but nothing verifies internal links resolve, titles/canonicals are correct, or that sitemap matches emitted pages.",
+  "notes": "Pages router chosen deliberately: unstable_runtimeJS: false removes ALL script tags and hydration JSON from the HTML, which the app router cannot do (app router always embeds the RSC payload + bootstrap scripts, hundreds of extra bytes-to-KB per page even with zero client components). Surprises: (1) install was fast for 'Next.js' fame \u2014 54 packages, but 337 MB on disk (SWC/turbopack native binaries); (2) Next 16 pages router no longer emits <meta name=next-head-count> but now stamps data-next-head=\"\" on every head tag instead \u2014 residue moved, didn't disappear; (3) React SSR inserts <!-- --> comments between adjacent text nodes, so the hand-placed newline text nodes had to be arranged so no two text nodes touch; (4) big build scaled superbly: 1901 pages in ~2.2s vs 7 pages in ~1.34s (~0.45ms/page marginal \u2014 parallel export workers); (5) compare.py flags unavoidable extra 404.html/404/index.html. Fidelity floor is exactly 15 diff lines/page (one-line head prelude + __next wrapper), 260 bytes/page overhead; body and sitemap are byte-exact.",
+  "runs_per_cell": 11
+}

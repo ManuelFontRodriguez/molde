@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+{{ std_head }}
+</head>
+<body>
+<h1>{{ item.name }} <small>{{ item.ticker }}</small></h1>
+<p>{{ item.sector }}</p>
+{% if item.upcoming %}
+<section class="upcoming{% if not item.upcoming.confirmed %} estimated{% endif %}">
+  <p>Next dividend: {{ item.upcoming.amount }} {{ item.upcoming.currency }} — ex {{ item.upcoming.ex_date }}</p>
+  {% if not item.upcoming.confirmed %}<p class="badge">Estimated — not yet declared</p>{% endif %}
+</section>
+{% else %}
+<p>No upcoming dividend declared.</p>
+{% endif %}
+<p><a href="/">← all stocks</a></p>
+</body>
+</html>

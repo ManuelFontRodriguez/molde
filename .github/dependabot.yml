@@ -1,0 +1,17 @@
+# Dependency upgrades arrive as PRs, one per crate, so CI (including the engine
+# contract in tests/engine_contract.rs) says whether each upgrade changes output.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci

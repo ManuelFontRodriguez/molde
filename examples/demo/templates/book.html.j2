@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+{{ std_head }}
+<script type="application/ld+json">
+{{ {"@context": "https://schema.org", "@type": "Book", "name": item.title, "author": {"@type": "Person", "name": item.author}, "datePublished": item.published} | tojson }}
+</script>
+</head>
+<body>
+<h1>{{ item.title }} <small>{{ item.author }}</small></h1>
+<p><a href="/genres/{{ item.genre | slug }}/">{{ item.genre }}</a>, first published {{ item.published | year }}</p>
+{% if item.loan %}
+<section class="loan{% if item.loan.reserved %} reserved{% endif %}">
+  <p>On loan, due back {{ item.loan.due }}</p>
+  {% if item.loan.reserved %}<p class="badge">Reserved — join the waiting list</p>{% endif %}
+</section>
+{% else %}
+<p>On the shelf.</p>
+{% endif %}
+<p><a href="/">← all books</a></p>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{{ printf `<?xml version="1.0" encoding="UTF-8"?>` | safeHTML }}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{{ site.BaseURL }}</loc></url>
+{{- range hugo.Data.stocks.stocks }}
+  <url><loc>{{ site.BaseURL }}stocks/{{ .ticker }}/</loc></url>
+{{- end }}
+</urlset>

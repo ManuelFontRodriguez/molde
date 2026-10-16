@@ -1,0 +1,14 @@
+{
+  "name": "nextjs-benchmark-port",
+  "version": "1.0.0",
+  "scripts": {
+    "prebuild": "node scripts/prebuild.js",
+    "build": "next build"
+  },
+  "dependencies": {
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "private": true
+}

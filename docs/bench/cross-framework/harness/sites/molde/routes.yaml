@@ -1,0 +1,8 @@
+routes:
+  - path: /index.html
+    template: index.html.j2
+    title: "Demo — dividend stocks"
+  - path: /stocks/{ticker}/index.html
+    template: stock.html.j2
+    foreach: stocks
+    title: "{{ item.name }} ({{ item.ticker }})"

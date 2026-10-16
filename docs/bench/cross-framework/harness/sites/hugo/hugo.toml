@@ -1,0 +1,10 @@
+baseURL = "https://demo.example/"
+title = "Demo — dividend stocks"
+
+# Byte-parity requirements vs the golden target:
+disableHugoGeneratorInject = true            # no <meta name="generator"> line
+disableKinds = ["taxonomy", "term", "rss", "section", "404"]
+enableRobotsTXT = true                       # rendered from layouts/robots.txt
+
+[minify]
+minifyOutput = false

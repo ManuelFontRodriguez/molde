@@ -1,0 +1,11 @@
+{% extends "_layout.html.j2" %}
+{% import "_util.html.j2" as u %}
+{% block main %}
+<h1>{{ t('list.title') }}</h1>
+{{ u.city_list(pagination.items, locale) }}
+<nav class="pager" aria-label="{{ t('nav.pages') }}">
+  {% if pagination.prev %}<a href="{{ pagination.prev }}" rel="prev">{{ t('list.previous') }}</a>{% endif %}
+  {% for l in pagination.links %}{% if l.n == pagination.n %}<strong aria-current="page">{{ l.n }}</strong>{% else %}<a href="{{ l.path }}">{{ l.n }}</a>{% endif %} {% endfor %}
+  {% if pagination.next %}<a href="{{ pagination.next }}" rel="next">{{ t('list.next') }}</a>{% endif %}
+</nav>
+{% endblock %}

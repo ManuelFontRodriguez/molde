@@ -1,0 +1,61 @@
+# Changelog
+
+Every change to molde's public surface (the command line, the site format, the check
+report) is listed here under the release that makes it, with what to do. What each kind
+of release may change is in the reference's
+[compatibility](docs/reference.md#compatibility) section.
+
+## 0.1.0-rc.1 — unreleased
+
+The first public release candidate.
+
+### What molde does
+
+- `molde check` renders the site into an immutable build, runs every conformance
+  check, and returns one JSON report. It publishes (swaps `out/current`) only on a
+  passing verdict; otherwise the last good build stays live.
+- Commands: `build`, `check`, `routes`, `render`, `diff`, `gc`, `serve` (with `--watch` and
+  `--reload`), `events`, `mcp`.
+- Site format: `routes.yaml` (path patterns, `foreach`, `paginate`, title,
+  description, index and lastmod patterns, JSON-LD types), minijinja templates,
+  `data.json`, an optional `site.yaml` (web standards, size budgets, locales) and
+  `translations/`.
+- Pages can be left out of search engines with `index: false` (noindex meta, kept out of
+  the sitemap). With `base_url`, molde writes `sitemap.xml` and a `robots.txt` that points
+  at it (your own `static/robots.txt` wins).
+- Locales: the default locale at the root, or every locale prefixed
+  (`prefix_default_locale`); `localized:` fields per route; `locales: none` for pages that
+  belong to no language.
+- Template filters of molde's own: `slug`, `year`, `date_format` and `num_format`, and
+  with locales `t`, `t_html` and `loc`.
+- Builds: every page gets a precompressed `.gz` sibling, an unchanged rebuild reuses the
+  previous build, `molde diff` compares any two builds (`--from`, `--to`, `--full`),
+  `molde gc` prunes them, and `molde serve` answers missing pages with the site's
+  `/404.html`. `molde events` takes `--port` and `--min-interval-secs`.
+- Checks: internal links (relative ones, `srcset` and stylesheet `url()` included),
+  text escaped twice, titles, the sitemap, canonical and Open Graph tags,
+  descriptions, robots, JSON-LD, output budgets, locales (paths, `lang`, hreflang,
+  translations), and a source layer that reports template and file errors with the
+  file, line, page and route.
+- `group_by` makes one page per distinct value of an item field (genre or tag pages),
+  following the data with no hand-kept list. `{field|slug}` in a path and the `slug`
+  filter in templates turn any value into a URL segment (`Science Fiction` →
+  `science-fiction`).
+- Errors name the fix: a `--site` folder without `routes.yaml`, a `foreach` or
+  `paginate.over` collection missing from `data.json` (with the arrays that exist), a
+  `{field}` path value that is not a string or an integer, and a date filter given a
+  number. Integer fields (`"id": 42`) work in paths, and a UTF-8 byte order mark at the
+  start of `data.json` or a YAML file is ignored.
+- `.DS_Store` and `Thumbs.db` under `static/` are not copied into builds, and a static
+  page's unquoted `<meta name=robots content=noindex>` counts as noindex like the
+  quoted forms.
+- Above 50,000 URLs or 50 MB, `sitemap.xml` becomes a sitemap index of
+  `sitemap-1.xml`, `sitemap-2.xml`, ….
+- `molde mcp` serves all of this to an agent over the Model Context Protocol.
+- Three example sites: `examples/demo` (the quickstart), `examples/multilingual` (three
+  languages) and `examples/broken` (five mistakes and the report that finds them).
+- Dates and numbers are formatted for 529 locales from bundled Unicode CLDR 48 data,
+  matching ICU byte for byte.
+- Release archives for Linux (x86-64, arm64; static) and macOS (arm64, x86-64), with
+  SHA-256 checksums and third-party licence notices.
+- molde runs on Linux and macOS and needs Rust 1.89 or newer to build from source.

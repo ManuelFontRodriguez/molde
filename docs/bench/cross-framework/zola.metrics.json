@@ -1,0 +1,32 @@
+{
+  "framework": "zola",
+  "version": "0.23.6",
+  "install_seconds": 1.71,
+  "deps_disk_mb": 41,
+  "dep_count": 1,
+  "files_authored": 7,
+  "loc_authored": 89,
+  "build_ms_small": 39,
+  "build_ms_small_split": {
+    "gen_content_py": 25,
+    "zola_build": 17
+  },
+  "build_ms_big": 744,
+  "build_ms_big_split": {
+    "gen_content_py": 391,
+    "zola_build": 419
+  },
+  "fidelity_raw_diff": 0,
+  "fidelity_normalized_diff": 0,
+  "irreducible_residue": "404.html always emitted (no config switch to disable); nothing injected into authored pages",
+  "features_manual": [
+    "content generation from data.json (Zola has no data->pages mechanism; gen_content.py emits one .md per stock every build)",
+    "head: title pattern, canonical, og:title/og:url/og:type",
+    "sitemap format (built-in emits its own layout; templates/sitemap.xml override needed for parity \u2014 but unlike Hugo/Astro the override is possible)",
+    "robots.txt override for parity",
+    "explicit path frontmatter per page (default slugify lowercases /stocks/KO/ -> /stocks/ko/)"
+  ],
+  "conformance_checks": "zola check exists (internal+external link checker) but reads markdown content only \u2014 it cannot see template-emitted hrefs, which is every link on this site; separate command, does not gate build; no title/sitemap/canonical checks",
+  "notes": "Byte-parity (raw=0 all files) on the first successful build: Tera untrimmed whitespace semantics are identical to minijinja, strongest confirmation of finding #1. Friction: one config.toml field guessed wrong (unknown field error was clear), section _index.md with render=false needed so /stocks/ has no page of its own. Big-build cost is dominated by the mandatory generation step (451 of 846 ms); zola build alone on 1,901 pre-generated pages is 424 ms. Installed with `brew install zola` (41 MB single binary, bottle).",
+  "runs_per_cell": 11
+}

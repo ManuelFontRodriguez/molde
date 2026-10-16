@@ -1,0 +1,137 @@
+{
+  "errors": [
+    {
+      "attribute": "href",
+      "broken_href": "/books/dnue/",
+      "check": "links.internal",
+      "hint": "no file in the build matches this href — add a route that emits it, or fix the href",
+      "layer": "output",
+      "page": "index.html",
+      "route": "/index.html",
+      "template": "index.html.j2"
+    },
+    {
+      "attribute": "url()",
+      "broken_href": "/fonts/serif.woff2",
+      "check": "links.internal",
+      "hint": "no file in the build matches this href — add a route that emits it, or fix the href",
+      "layer": "output",
+      "page": "style.css"
+    },
+    {
+      "check": "titles.duplicate",
+      "duplicate_of": "genres/classic-fiction/index.html",
+      "hint": "if this is a foreach route, make its title pattern item-dependent, e.g. \"{{ item.name }} by {{ item.author }}\" (a `localized:` field: `{{ item.name | loc }}`)",
+      "layer": "output",
+      "page": "genres/popular-science/index.html",
+      "route": "/genres/{genre|slug}/index.html",
+      "template": "genre.html.j2",
+      "title": "Genre — Demo library"
+    },
+    {
+      "check": "titles.duplicate",
+      "duplicate_of": "genres/classic-fiction/index.html",
+      "hint": "if this is a foreach route, make its title pattern item-dependent, e.g. \"{{ item.name }} by {{ item.author }}\" (a `localized:` field: `{{ item.name | loc }}`)",
+      "layer": "output",
+      "page": "genres/science-fiction/index.html",
+      "route": "/genres/{genre|slug}/index.html",
+      "template": "genre.html.j2",
+      "title": "Genre — Demo library"
+    },
+    {
+      "check": "jsonld.type_missing",
+      "found": [
+        "CreativeWork",
+        "Person"
+      ],
+      "hint": "the route declares `jsonld:` types this page's JSON-LD doesn't carry — add an object with that \"@type\" (top level, inside @graph, or nested), or fix a misspelled type in routes.yaml; `found` lists what the page does carry",
+      "layer": "output",
+      "missing": [
+        "Book"
+      ],
+      "page": "books/a-brief-history-of-time/index.html",
+      "route": "/books/{id}/index.html",
+      "template": "book.html.j2"
+    },
+    {
+      "check": "jsonld.type_missing",
+      "found": [
+        "CreativeWork",
+        "Person"
+      ],
+      "hint": "the route declares `jsonld:` types this page's JSON-LD doesn't carry — add an object with that \"@type\" (top level, inside @graph, or nested), or fix a misspelled type in routes.yaml; `found` lists what the page does carry",
+      "layer": "output",
+      "missing": [
+        "Book"
+      ],
+      "page": "books/dune/index.html",
+      "route": "/books/{id}/index.html",
+      "template": "book.html.j2"
+    },
+    {
+      "check": "jsonld.type_missing",
+      "found": [
+        "CreativeWork",
+        "Person"
+      ],
+      "hint": "the route declares `jsonld:` types this page's JSON-LD doesn't carry — add an object with that \"@type\" (top level, inside @graph, or nested), or fix a misspelled type in routes.yaml; `found` lists what the page does carry",
+      "layer": "output",
+      "missing": [
+        "Book"
+      ],
+      "page": "books/pride-and-prejudice/index.html",
+      "route": "/books/{id}/index.html",
+      "template": "book.html.j2"
+    },
+    {
+      "check": "jsonld.type_missing",
+      "found": [
+        "CreativeWork",
+        "Person"
+      ],
+      "hint": "the route declares `jsonld:` types this page's JSON-LD doesn't carry — add an object with that \"@type\" (top level, inside @graph, or nested), or fix a misspelled type in routes.yaml; `found` lists what the page does carry",
+      "layer": "output",
+      "missing": [
+        "Book"
+      ],
+      "page": "books/the-left-hand-of-darkness/index.html",
+      "route": "/books/{id}/index.html",
+      "template": "book.html.j2"
+    },
+    {
+      "check": "html.double_escaped",
+      "context": "ref=\"/style.css\"> <title>Pride &amp;amp; Prejudice by Jane Austen</tit",
+      "count": 5,
+      "found": "&amp;amp;",
+      "hint": "text is escaped twice and shows as `&amp;` (or `&lt;`, …) in the browser — usually data that already holds HTML entities (decode them where data.json is made), or a hand-written `replace(\"&\", \"&amp;\")` or `| e` that autoescape escapes again (remove it)",
+      "layer": "output",
+      "page": "books/pride-and-prejudice/index.html",
+      "route": "/books/{id}/index.html",
+      "template": "book.html.j2"
+    },
+    {
+      "check": "html.double_escaped",
+      "context": "ks/pride-and-prejudice/\">Pride &amp;amp; Prejudice</a> — Jane Austen</",
+      "count": 1,
+      "found": "&amp;amp;",
+      "hint": "text is escaped twice and shows as `&amp;` (or `&lt;`, …) in the browser — usually data that already holds HTML entities (decode them where data.json is made), or a hand-written `replace(\"&\", \"&amp;\")` or `| e` that autoescape escapes again (remove it)",
+      "layer": "output",
+      "page": "genres/classic-fiction/index.html",
+      "route": "/genres/{genre|slug}/index.html",
+      "template": "genre.html.j2"
+    },
+    {
+      "check": "html.double_escaped",
+      "context": "ks/pride-and-prejudice/\">Pride &amp;amp; Prejudice</a> — Jane Austen,",
+      "count": 1,
+      "found": "&amp;amp;",
+      "hint": "text is escaped twice and shows as `&amp;` (or `&lt;`, …) in the browser — usually data that already holds HTML entities (decode them where data.json is made), or a hand-written `replace(\"&\", \"&amp;\")` or `| e` that autoescape escapes again (remove it)",
+      "layer": "output",
+      "page": "index.html",
+      "route": "/index.html",
+      "template": "index.html.j2"
+    }
+  ],
+  "published": false,
+  "verdict": "fail"
+}

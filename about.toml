@@ -1,0 +1,13 @@
+# cargo-about: the licence texts of every crate compiled into a release binary,
+# written to THIRD-PARTY-NOTICES.md in each archive (.github/workflows/release.yml).
+accepted = [
+  "MIT",
+  "Apache-2.0",
+  "BSL-1.0",
+  "0BSD",
+  "Unlicense",
+  "Zlib",
+  "Unicode-3.0",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true

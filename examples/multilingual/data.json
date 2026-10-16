@@ -1,0 +1,19 @@
+{
+  "cities": [
+    { "country": "Portugal", "population": "545796", "founded": "1147-10-25", "updated": "2026-09-14",
+      "slug": { "en": "lisbon", "es": "lisboa", "de": "lissabon" },
+      "name": { "en": "Lisbon", "es": "Lisboa", "de": "Lissabon" } },
+    { "country": "Portugal", "population": "231800", "founded": "1123-05-14", "updated": "2026-09-02",
+      "slug": { "en": "porto", "es": "oporto", "de": "porto" },
+      "name": { "en": "Porto", "es": "Oporto", "de": "Porto" } },
+    { "country": "Spain", "population": "684234", "founded": "1248-11-23", "updated": "2026-09-20",
+      "slug": { "en": "seville", "es": "sevilla", "de": "sevilla" },
+      "name": { "en": "Seville", "es": "Sevilla", "de": "Sevilla" } },
+    { "country": "Spain", "population": "807693", "founded": "1238-10-09", "updated": "2026-08-30",
+      "slug": { "en": "valencia", "es": "valencia", "de": null },
+      "name": { "en": "Valencia", "es": "Valencia", "de": null } },
+    { "country": "Côte d'Ivoire", "population": "5616633", "founded": "1903-01-01", "updated": "2026-09-11",
+      "slug": { "en": "abidjan", "es": "abiyan", "de": "abidjan" },
+      "name": { "en": "Abidjan", "es": "Abiyán", "de": "Abidjan" } }
+  ]
+}

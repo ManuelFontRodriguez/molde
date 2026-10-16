@@ -1,0 +1,23 @@
+routes:
+  - path: /index.html
+    template: index.html.j2
+    title: "Demo — a small library"
+    description: "{{ data.books | length }} books in the catalogue, by genre, with what is on loan."
+    lastmod: "{{ data.books | map(attribute='updated') | max }}"   # the last data change, never the build time
+  - path: /books/{id}/index.html
+    template: book.html.j2
+    foreach: books
+    jsonld: Book                          # check: every book page carries this @type
+    title: "{{ item.title }} by {{ item.author }}"
+    description: "{{ item.title }} ({{ item.published | year }}), {{ item.genre }}: {% if item.loan %}on loan, due back {{ item.loan.due }}{% else %}on the shelf{% endif %}."
+    lastmod: "{{ item.updated }}"
+  - path: /genres/{genre|slug}/index.html   # one page per genre in the data; "Science Fiction" -> science-fiction
+    template: genre.html.j2
+    foreach: books
+    group_by: genre
+    title: "{{ item.genre }} — Demo library"
+    description: "{{ item.items | length }} {{ item.genre }} books in the catalogue."
+  - path: /404.html
+    template: 404.html.j2
+    title: "Page not found — Demo library"
+    index: false                          # rendered, served on misses, never in sitemap.xml

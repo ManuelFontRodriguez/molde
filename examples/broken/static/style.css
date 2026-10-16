@@ -1,0 +1,5 @@
+@font-face { font-family: "Serif"; src: url("/fonts/serif.woff2") format("woff2"); }
+body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; }
+h1 small { color: #666; font-weight: normal; }
+.badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 0.25rem; background: #fce8b2; }
+.loan.reserved { color: #7a5c00; }

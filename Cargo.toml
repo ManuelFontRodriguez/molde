@@ -1,0 +1,46 @@
+[package]
+name = "molde"
+version = "0.1.0-rc.1"
+edition = "2021"
+rust-version = "1.89"
+description = "Agent-first static site generator: data and templates in, a verified site and one JSON report out."
+# molde's code is MIT or Apache-2.0, at your option; the CLDR locale data compiled in
+# is under the Unicode licence (src/i18n/LICENSE-UNICODE).
+license = "(MIT OR Apache-2.0) AND Unicode-3.0"
+repository = "https://github.com/ManuelFontRodriguez/molde"
+homepage = "https://github.com/ManuelFontRodriguez/molde"
+readme = "README.md"
+keywords = ["static-site-generator", "ssg", "mcp", "agents", "seo"]
+categories = ["command-line-utilities", "web-programming", "template-engine"]
+# What `cargo package` ships: the source, its data and licences, and the docs a
+# user reads. Not the benchmark sites, test goldens or data generators.
+include = [
+  "/src/**",
+  "/build.rs",
+  "/Cargo.toml",
+  "/Cargo.lock",
+  "/README.md",
+  "/SECURITY.md",
+  "/LICENSE*",
+  "/docs/reference.md",
+]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+minijinja = { version = "2", features = ["loader", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# serde_yaml is archived by its author but stable, and it reads YAML 1.2: `no`, `yes`,
+# `on`, `y` stay strings. The maintained alternatives tried read them as booleans and
+# `012` as a number (YAML 1.1 rules), which would silently change translations and
+# locale tags such as `no`. It stays until a maintained YAML 1.2 parser exists.
+serde_yaml = "0.9"
+regex = "1"
+flate2 = "1"
+walkdir = "2"
+unicode-normalization = "0.1"
+
+[profile.release]
+lto = true
+codegen-units = 1

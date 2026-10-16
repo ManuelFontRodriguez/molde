@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/ManuelFontRodriguez/molde/discussions
+    about: Ask how to do something, or propose a capability, in Discussions.
+  - name: Security problem
+    url: https://github.com/ManuelFontRodriguez/molde/security/advisories/new
+    about: Report it privately, not as an issue (see SECURITY.md).

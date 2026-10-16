@@ -1,0 +1,247 @@
+{
+  "machine": {
+    "cpu": "Apple M4 Pro",
+    "ram_gb": 24,
+    "os": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "node": "v22.15.0",
+    "npm": "10.9.2",
+    "python": "3.14.5",
+    "runs_per_cell": 11,
+    "load_avg_at_start": [
+      3.4794921875,
+      3.86962890625,
+      6.671875
+    ]
+  },
+  "frameworks": {
+    "molde": {
+      "install_seconds": 0,
+      "deps_disk_mb": 5,
+      "dep_count": 51,
+      "install_what": "prebuilt single binary (crates compiled in; dep_count = crates in Cargo.lock, excluding molde itself)",
+      "version": "0.1.0-rc.1",
+      "version_output": "molde 0.1.0-rc.1 (da8206ecd6 2026-10-15)",
+      "files_authored": 4,
+      "loc_authored": 44,
+      "authored_files": [
+        "routes.yaml",
+        "site.yaml",
+        "templates/index.html.j2",
+        "templates/stock.html.j2"
+      ],
+      "fidelity": "TOTAL raw=0 normalized=0 missing=[] extra_html=[]",
+      "extra_files": 0,
+      "extra_bytes": 0,
+      "build_small": {
+        "median_ms": 6.8,
+        "min_ms": 6.5,
+        "max_ms": 8.2,
+        "runs": 11
+      },
+      "build_big": {
+        "median_ms": 170.1,
+        "min_ms": 167.2,
+        "max_ms": 173.6,
+        "runs": 11
+      },
+      "check_big": {
+        "median_ms": 477.0,
+        "min_ms": 443.7,
+        "max_ms": 541.4,
+        "runs": 11
+      },
+      "check_small": {
+        "median_ms": 9.7,
+        "min_ms": 9.4,
+        "max_ms": 10.4,
+        "runs": 11
+      }
+    },
+    "zola": {
+      "install_seconds": 1.71,
+      "deps_disk_mb": 41,
+      "dep_count": 1,
+      "install_what": "brew reinstall, bottle already cached, median of 3",
+      "version": "0.23.6",
+      "files_authored": 7,
+      "loc_authored": 89,
+      "authored_files": [
+        "config.toml",
+        "content/_index.md",
+        "gen_content.py",
+        "templates/index.html",
+        "templates/robots.txt",
+        "templates/sitemap.xml",
+        "templates/stock.html"
+      ],
+      "fidelity": "TOTAL raw=0 normalized=0 missing=[] extra_html=['404.html']",
+      "extra_files": 1,
+      "extra_bytes": 68,
+      "build_small": {
+        "median_ms": 38.9,
+        "min_ms": 38.2,
+        "max_ms": 51.3,
+        "runs": 11
+      },
+      "small_split": {
+        "generate": {
+          "median_ms": 24.7,
+          "min_ms": 24.2,
+          "max_ms": 27.1,
+          "runs": 11
+        },
+        "zola_build": {
+          "median_ms": 16.6,
+          "min_ms": 15.7,
+          "max_ms": 17.3,
+          "runs": 11
+        }
+      },
+      "build_big": {
+        "median_ms": 744.4,
+        "min_ms": 590.8,
+        "max_ms": 788.5,
+        "runs": 11
+      },
+      "big_split": {
+        "generate": {
+          "median_ms": 391.0,
+          "min_ms": 385.0,
+          "max_ms": 426.6,
+          "runs": 11
+        },
+        "zola_build": {
+          "median_ms": 418.7,
+          "min_ms": 406.3,
+          "max_ms": 429.1,
+          "runs": 11
+        }
+      }
+    },
+    "hugo": {
+      "install_seconds": 1.41,
+      "deps_disk_mb": 86,
+      "dep_count": 1,
+      "install_what": "brew reinstall, bottle already cached, median of 3",
+      "version": "0.168.0",
+      "files_authored": 7,
+      "loc_authored": 74,
+      "authored_files": [
+        "content/_index.md",
+        "content/stocks/_content.gotmpl",
+        "hugo.toml",
+        "layouts/home.html",
+        "layouts/page.html",
+        "layouts/robots.txt",
+        "layouts/sitemap.xml"
+      ],
+      "fidelity": "TOTAL raw=0 normalized=0 missing=[] extra_html=[]",
+      "extra_files": 0,
+      "extra_bytes": 0,
+      "build_small": {
+        "median_ms": 50.2,
+        "min_ms": 49.1,
+        "max_ms": 52.8,
+        "runs": 11
+      },
+      "build_big": {
+        "median_ms": 302.0,
+        "min_ms": 291.5,
+        "max_ms": 310.8,
+        "runs": 11
+      }
+    },
+    "eleventy": {
+      "install_seconds": 0.45,
+      "deps_disk_mb": 22,
+      "dep_count": 130,
+      "version": "3.1.6",
+      "install_what": "npm ci, warm npm cache, median of 3",
+      "files_authored": 3,
+      "loc_authored": 69,
+      "authored_files": [
+        "eleventy.config.js",
+        "src/index.njk",
+        "src/stocks.njk"
+      ],
+      "fidelity": "TOTAL raw=0 normalized=0 missing=[] extra_html=[]",
+      "extra_files": 0,
+      "extra_bytes": 0,
+      "build_small": {
+        "median_ms": 287.7,
+        "min_ms": 285.4,
+        "max_ms": 447.4,
+        "runs": 11
+      },
+      "build_big": {
+        "median_ms": 781.4,
+        "min_ms": 774.8,
+        "max_ms": 838.8,
+        "runs": 11
+      }
+    },
+    "astro": {
+      "install_seconds": 1.1,
+      "deps_disk_mb": 167,
+      "dep_count": 286,
+      "version": "7.3.8",
+      "install_what": "npm ci, warm npm cache, median of 3",
+      "files_authored": 4,
+      "loc_authored": 94,
+      "authored_files": [
+        "astro.config.mjs",
+        "src/pages/index.astro",
+        "src/pages/sitemap.xml.js",
+        "src/pages/stocks/[ticker].astro"
+      ],
+      "fidelity": "TOTAL raw=0 normalized=0 missing=[] extra_html=[]",
+      "extra_files": 0,
+      "extra_bytes": 0,
+      "build_small": {
+        "median_ms": 558.9,
+        "min_ms": 555.3,
+        "max_ms": 1383.3,
+        "runs": 11
+      },
+      "build_big": {
+        "median_ms": 965.3,
+        "min_ms": 957.0,
+        "max_ms": 1005.9,
+        "runs": 11
+      }
+    },
+    "nextjs": {
+      "install_seconds": 2.01,
+      "deps_disk_mb": 337,
+      "dep_count": 54,
+      "version": "16.4.0",
+      "install_what": "npm ci, warm npm cache, median of 3",
+      "files_authored": 7,
+      "loc_authored": 156,
+      "authored_files": [
+        "lib/data.js",
+        "lib/html.js",
+        "next.config.js",
+        "pages/_document.js",
+        "pages/index.js",
+        "pages/stocks/[ticker].js",
+        "scripts/prebuild.js"
+      ],
+      "fidelity": "TOTAL raw=75 normalized=75 missing=[] extra_html=['404.html', '404/index.html']",
+      "extra_files": 21,
+      "extra_bytes": 387860,
+      "build_small": {
+        "median_ms": 1361.4,
+        "min_ms": 1321.5,
+        "max_ms": 2013.7,
+        "runs": 11
+      },
+      "build_big": {
+        "median_ms": 2181.0,
+        "min_ms": 2015.4,
+        "max_ms": 2217.9,
+        "runs": 11
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+base_url: https://guide.example
+locales: [en, es, de]          # English is the default and lives at the root; /es/… and /de/…
+budgets:                       # every page stays small, measured as the bytes a server sends
+  - match: "*.html"
+    max_gzip_bytes: 2000

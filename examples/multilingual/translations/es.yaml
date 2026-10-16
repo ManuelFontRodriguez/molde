@@ -1,0 +1,28 @@
+site:
+  name: Guía de ciudades
+home:
+  countries: Por país
+  title: Guía de ciudades
+  description: "Ciudades con su población y su historia, por país."
+  intro: "Una pequeña guía de {count} ciudades. Elige una, o recórrelas por país."
+city:
+  description: "{name}, {country}: población e historia."
+  population: Población
+  founded: Fundación
+  country: País
+country:
+  description: "Ciudades de {country}."
+  portugal: Portugal
+  spain: España
+  cote-d-ivoire: Costa de Marfil
+list:
+  title: Todas las ciudades
+  page: "página {n}"
+  previous: Anterior
+  next: Siguiente
+nav:
+  label: Sitio
+  pages: Páginas
+  home: Inicio
+  all: Todas las ciudades
+  languages: Leer esta página en

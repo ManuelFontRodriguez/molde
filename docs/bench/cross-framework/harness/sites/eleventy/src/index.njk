@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+<title>Demo — dividend stocks</title>
+<link rel="canonical" href="https://demo.example/">
+<meta property="og:title" content="Demo — dividend stocks">
+<meta property="og:url" content="https://demo.example/">
+<meta property="og:type" content="website">
+</head>
+<body>
+<h1>Stocks (cycle {{ demo.cycle_id }})</h1>
+<ul>
+{% for s in demo.stocks %}
+  <li><a href="/stocks/{{ s.ticker }}/">{{ s.name }}</a> — {{ s.sector }}</li>
+{% endfor %}
+</ul>
+</body>
+</html>

@@ -1,0 +1,31 @@
+---
+pagination:
+  data: demo.stocks
+  size: 1
+  alias: s
+permalink: "/stocks/{{ s.ticker }}/"
+---
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+<title>{{ s.name }} ({{ s.ticker }})</title>
+<link rel="canonical" href="https://demo.example/stocks/{{ s.ticker }}/">
+<meta property="og:title" content="{{ s.name }} ({{ s.ticker }})">
+<meta property="og:url" content="https://demo.example/stocks/{{ s.ticker }}/">
+<meta property="og:type" content="website">
+</head>
+<body>
+<h1>{{ s.name }} <small>{{ s.ticker }}</small></h1>
+<p>{{ s.sector }}</p>
+{% if s.upcoming %}
+<section class="upcoming{% if not s.upcoming.confirmed %} estimated{% endif %}">
+  <p>Next dividend: {{ s.upcoming.amount }} {{ s.upcoming.currency }} — ex {{ s.upcoming.ex_date }}</p>
+  {% if not s.upcoming.confirmed %}<p class="badge">Estimated — not yet declared</p>{% endif %}
+</section>
+{% else %}
+<p>No upcoming dividend declared.</p>
+{% endif %}
+<p><a href="/">← all stocks</a></p>
+</body>
+</html>

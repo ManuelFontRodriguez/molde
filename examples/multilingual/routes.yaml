@@ -1,0 +1,49 @@
+routes:
+  - path: /index.html                        # /index.html, /es/index.html, /de/index.html
+    template: home.html.j2
+    title: "{{ t('home.title') }}"
+    description: "{{ t('home.description') }}"
+    lastmod: "{{ data.cities | map(attribute='updated') | max }}"
+
+  - path:                                    # one pattern per locale
+      en: /cities/{slug}/index.html
+      es: /ciudades/{slug}/index.html
+      de: /staedte/{slug}/index.html
+    template: city.html.j2
+    foreach: cities
+    localized: [slug, name]                  # {locale: value} maps; null = no page in that locale
+    jsonld: City
+    title: "{{ item.name | loc }} — {{ t('site.name') }}"
+    description: "{{ t('city.description', name=item.name | loc, country=t('country.' ~ (item.country | slug))) }}"
+    lastmod: "{{ item.updated }}"
+
+  - path:                                    # one page per country found in the data
+      en: /countries/{country|slug}/index.html
+      es: /paises/{country|slug}/index.html
+      de: /laender/{country|slug}/index.html
+    template: country.html.j2
+    foreach: cities
+    group_by: country
+    title: "{{ t('country.' ~ (item.country | slug)) }} — {{ t('site.name') }}"
+    description: "{{ t('country.description', country=t('country.' ~ (item.country | slug))) }}"
+
+  - path:                                    # the full list, two cities per page
+      en: /cities/index.html
+      es: /ciudades/index.html
+      de: /staedte/index.html
+    template: list.html.j2
+    localized: [slug, name]                  # a city without a name in this locale is not listed
+    paginate:
+      over: cities
+      per_page: 2
+      path:
+        en: /cities/page/{n}/index.html
+        es: /ciudades/pagina/{n}/index.html
+        de: /staedte/seite/{n}/index.html
+    title: "{{ t('list.title') }}{% if pagination.n > 1 %} ({{ t('list.page', n=pagination.n) }}){% endif %}"
+
+  - path: /404.html
+    template: 404.html.j2
+    locales: none                            # once, at /404.html
+    title: "Page not found"
+    index: false

@@ -1,0 +1,19 @@
+{% extends "_layout.html.j2" %}
+{% import "_util.html.j2" as u %}
+{% block head %}
+<script type="application/ld+json">
+{{ {"@context": "https://schema.org", "@type": "City", "name": item.name | loc, "url": page.url,
+    "containedInPlace": {"@type": "Country", "name": t("country." ~ (item.country | slug))}} | tojson }}
+</script>
+{% endblock %}
+{% block main %}
+<h1>{{ item.name | loc }}</h1>
+<dl>
+  <dt>{{ t('city.country') }}</dt>
+  <dd><a href="{{ u.country_path(item.country, locale) }}">{{ t('country.' ~ (item.country | slug)) }}</a></dd>
+  <dt>{{ t('city.population') }}</dt>
+  <dd>{{ item.population | num_format(grouping=true) }}</dd>
+  <dt>{{ t('city.founded') }}</dt>
+  <dd>{{ item.founded | date_format(style="long") }}</dd>
+</dl>
+{% endblock %}

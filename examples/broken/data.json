@@ -1,0 +1,46 @@
+{
+  "books": [
+    {
+      "id": "dune",
+      "title": "Dune",
+      "author": "Frank Herbert",
+      "genre": "Science Fiction",
+      "published": "1965-08-01",
+      "updated": "2026-09-18",
+      "loan": {
+        "due": "2026-10-02",
+        "reserved": true
+      }
+    },
+    {
+      "id": "pride-and-prejudice",
+      "title": "Pride &amp; Prejudice",
+      "author": "Jane Austen",
+      "genre": "Classic Fiction",
+      "published": "1813-01-28",
+      "updated": "2026-09-17",
+      "loan": null
+    },
+    {
+      "id": "the-left-hand-of-darkness",
+      "title": "The Left Hand of Darkness",
+      "author": "Ursula K. Le Guin",
+      "genre": "Science Fiction",
+      "published": "1969-03-01",
+      "updated": "2026-09-12",
+      "loan": {
+        "due": "2026-09-30",
+        "reserved": false
+      }
+    },
+    {
+      "id": "a-brief-history-of-time",
+      "title": "A Brief History of Time",
+      "author": "Stephen Hawking",
+      "genre": "Popular Science",
+      "published": "1988-04-01",
+      "updated": "2026-09-18",
+      "loan": null
+    }
+  ]
+}

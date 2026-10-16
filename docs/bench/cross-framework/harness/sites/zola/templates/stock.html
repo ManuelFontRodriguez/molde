@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8">
+<link rel="stylesheet" href="/style.css">
+<title>{{ page.title }}</title>
+<link rel="canonical" href="{{ page.permalink | safe }}">
+<meta property="og:title" content="{{ page.title }}">
+<meta property="og:url" content="{{ page.permalink | safe }}">
+<meta property="og:type" content="website">
+</head>
+<body>
+<h1>{{ page.extra.name }} <small>{{ page.extra.ticker }}</small></h1>
+<p>{{ page.extra.sector }}</p>
+{% if page.extra.upcoming %}
+<section class="upcoming{% if not page.extra.upcoming.confirmed %} estimated{% endif %}">
+  <p>Next dividend: {{ page.extra.upcoming.amount }} {{ page.extra.upcoming.currency }} — ex {{ page.extra.upcoming.ex_date }}</p>
+  {% if not page.extra.upcoming.confirmed %}<p class="badge">Estimated — not yet declared</p>{% endif %}
+</section>
+{% else %}
+<p>No upcoming dividend declared.</p>
+{% endif %}
+<p><a href="/">← all stocks</a></p>
+</body>
+</html>
