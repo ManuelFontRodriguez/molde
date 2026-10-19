@@ -12,7 +12,7 @@ use crate::build::render_loaded;
 use crate::check::budgets::check_budgets;
 use crate::check::head::check_head;
 use crate::check::jsonld::check_jsonld;
-use crate::check::links::check_links;
+use crate::check::links::check_links_for;
 use crate::check::paths::check_duplicate_paths;
 use crate::check::sitemap::check_sitemap_at;
 use crate::check::titles::check_titles_scoped;
@@ -107,7 +107,7 @@ fn output_layer_errors(
     pages: &[Page],
     unknown_keys: &[(String, String, String)],
 ) -> Result<Vec<serde_json::Value>> {
-    let mut errors = check_links(build_dir)?;
+    let mut errors = check_links_for(build_dir, site.config.base_url.as_deref())?;
     errors.extend(check_titles_scoped(build_dir, pages)?);
     errors.extend(check_sitemap_at(
         build_dir,

@@ -126,6 +126,42 @@ fn query_fragment_and_protocol_relative_refs_resolve_like_a_browser() {
 }
 
 #[test]
+fn links_written_absolute_to_the_site_itself_are_checked() {
+    // base_url is https://x.example: a URL written absolute to it, in either scheme or
+    // protocol-relative, is a link into this build; another host stays another site
+    let dir = site("own-address");
+    fs::create_dir_all(dir.join("static")).unwrap();
+    fs::write(dir.join("static/x.css"), "a{}").unwrap();
+    fs::write(
+        dir.join("templates/i.j2"),
+        "<html><head>\n{{ std_head }}\n<link rel=\"stylesheet\" href=\"https://x.example/x.css?v=1\">\n\
+         </head><body><a href=\"https://x.example/\">home</a>\
+         <a href=\"https://x.example/gone/\">a</a><a href=\"http://X.example/gone2/\">b</a>\
+         <img src=\"//x.example/gone.png\"><a href=\"https://other.example/gone/\">c</a></body></html>",
+    )
+    .unwrap();
+    let report = molde::run_check(&dir, &dir.join("out")).unwrap();
+    assert_eq!(report["verdict"], "fail");
+    let broken: Vec<&str> = report["errors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["check"] == "links.internal")
+        .map(|e| e["broken_href"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        broken,
+        [
+            "https://x.example/gone/",
+            "http://X.example/gone2/",
+            "//x.example/gone.png"
+        ]
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn traversal_in_data_or_routes_fails_the_build() {
     // a {field} value from DATA must never walk out of the build dir —
     // data.json is untrusted input to the router

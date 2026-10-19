@@ -661,7 +661,7 @@ check, plus a `routes` array naming all offenders.
 | `paths.duplicate` | two routes (or two items of one foreach, or a `paginate.path` and another route) expand to the same output path — nothing is rendered at all (`layer: routes`, `build: null`). Compared with the leading slash trimmed and case-insensitively (case-only pairs collide on macOS/Windows dev filesystems). One error per colliding path: `routes` lists every offender, `route`/`template` carry the first, `pages_colliding` the count |
 | `paths.file_and_folder` | one page is written as a file at a path another page needs as a folder (`/docs` and `/docs/intro.html`): only one can exist on disk, so nothing is rendered (`page` = the file, `inside` = the page in the folder; `layer: routes`, `build: null`) |
 | `paths.reserved` | with `base_url` set, a route claims `/sitemap.xml` or `/sitemap-<n>.xml` — the framework emits those files from the route manifest and would overwrite the page (same `build: null` refusal) |
-| `links.internal` | an internal href resolves to no file in the build |
+| `links.internal` | an internal href resolves to no file in the build (with `base_url`, links written absolute to the site's own address are internal) |
 | `titles.missing` | a page has no non-empty `<title>` |
 | `titles.duplicate` | two pages share a title (`title`; `duplicate_of` names the first). With `locales:`, per locale: pages in different locales may share one; static files and `locales: none` pages are compared with every locale |
 | `titles.multiple` | a page has more than one `<title>` |
@@ -715,7 +715,9 @@ the files molde wrote with patterns, not a browser, so some things are invisible
 them. Knowing which keeps "verified" honest.
 
 What `links.internal` does read: `href` and `src` in any quoting (double, single or
-none), on any element, including attributes that end in them (`data-src`, `xlink:href`), root-relative or relative (resolved from the page's folder, as a browser does);
+none), on any element, including attributes that end in them (`data-src`, `xlink:href`), root-relative or relative (resolved from the page's folder, as a browser does), or, with
+`base_url` set, written absolute to the site's own address (`https://example.com/x/`,
+`http://` or `//example.com/x/` too: the host in any case, the path under `base_url`'s);
 every `srcset` candidate; and `url()` and `@import` in `.css` files (resolved from the
 stylesheet's folder), in `<style>` blocks and in `style` attributes. Entities and
 `%`-escapes are decoded first. What the checks do not see:
@@ -734,7 +736,9 @@ stylesheet's folder), in `<style>` blocks and in `style` attributes. Entities an
   script fails, passes. Nothing renders the page.
 - **Content a script adds at runtime** (client-side rendering, a search widget) is
   never seen.
-- **Links to other sites** (`https://…`, `//host/…`, `mailto:`) are not fetched.
+- **Links to other sites** (`https://…`, `//host/…`, `mailto:`) are not fetched. A link
+  to the site's own address is not another site: it is checked like a root-relative
+  one (see above).
 - **The words themselves.** A wrong value in the text, a stale date written by hand or
   a badge on the wrong pages passes: the checks verify structure and links, not
   meaning. Text escaped twice is the one content error they catch

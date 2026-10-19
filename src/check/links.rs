@@ -11,6 +11,14 @@ use std::sync::OnceLock;
 /// `srcset` candidate, and `url()`/`@import` in stylesheets, `<style>` blocks and
 /// `style` attributes.
 pub fn check_links(build_dir: &Path) -> Result<Vec<serde_json::Value>> {
+    check_links_for(build_dir, None)
+}
+
+/// [`check_links`], with the site's own address: with `base_url` set, a URL written
+/// absolute to it (`https://example.com/books/x/`, `//example.com/books/x/`, either
+/// scheme) is this build's and is checked like `/books/x/`.
+pub fn check_links_for(build_dir: &Path, base_url: Option<&str>) -> Result<Vec<serde_json::Value>> {
+    let own = base_url.and_then(SiteAddress::parse);
     // whether a target resolves, asked of the disk once per target for the whole
     // build: a site links to the same pages from thousands of pages
     let resolves: std::sync::RwLock<HashMap<String, bool>> = Default::default();
@@ -29,7 +37,7 @@ pub fn check_links(build_dir: &Path) -> Result<Vec<serde_json::Value>> {
         let mut errors = Vec::new();
         let mut seen = BTreeSet::new();
         for r in refs {
-            let Some(target) = resolve(&base, &r.written) else {
+            let Some(target) = resolve(&base, &r.written, own.as_ref()) else {
                 continue; // another site, a scheme, or this same page
             };
             if !seen.insert((r.attribute.clone(), target.clone())) {
@@ -179,15 +187,71 @@ fn url_dir(file: &Path) -> String {
     }
 }
 
+/// The site's public address, split as a browser compares it: the host case-insensitively,
+/// the path (`/blog` in `https://example.com/blog`) exactly.
+struct SiteAddress {
+    host: String,
+    path: String,
+}
+
+impl SiteAddress {
+    fn parse(base_url: &str) -> Option<Self> {
+        let rest = base_url
+            .strip_prefix("https://")
+            .or_else(|| base_url.strip_prefix("http://"))?;
+        let (host, path) = rest.split_once('/').unwrap_or((rest, ""));
+        Some(Self {
+            host: host.to_ascii_lowercase(),
+            path: format!("/{}", path.trim_end_matches('/')).replace("//", "/"),
+        })
+    }
+
+    /// The root-relative form of a URL written absolute to this site, or `None` when it
+    /// names another site (or another folder of the same host, outside the site's path).
+    fn own_path(&self, url: &str) -> Option<String> {
+        let rest = url
+            .strip_prefix("//")
+            .or_else(|| strip_prefix_ci(url, "https://"))
+            .or_else(|| strip_prefix_ci(url, "http://"))?;
+        let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+        if !rest[..end].eq_ignore_ascii_case(&self.host) {
+            return None;
+        }
+        let after = &rest[end..];
+        let after = if self.path == "/" {
+            after
+        } else {
+            after.strip_prefix(self.path.as_str())?
+        };
+        match after.chars().next() {
+            None => Some("/".into()),
+            Some('/') => Some(after.into()),
+            Some('?' | '#') => Some(format!("/{after}")),
+            Some(_) => None, // `/blogroll` is not under `/blog`
+        }
+    }
+}
+
+fn strip_prefix_ci<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
+    (s.len() >= prefix.len() && s[..prefix.len()].eq_ignore_ascii_case(prefix))
+        .then(|| &s[prefix.len()..])
+}
+
 /// The build path a URL names, resolved from the folder `base` the way a browser
 /// resolves it. `None` when the URL is not this build's (a scheme such as `https:`,
-/// `mailto:` or `data:`, a `//host`, a bare `#fragment` or `?query`, an empty value);
-/// `Some(None)` when it climbs above the site root, which no file of the build can be.
-fn resolve(base: &str, written: &str) -> Option<Option<String>> {
+/// `mailto:` or `data:`, a `//host` that isn't the site's own address, a bare
+/// `#fragment` or `?query`, an empty value); `Some(None)` when it climbs above the site
+/// root, which no file of the build can be.
+fn resolve(base: &str, written: &str, own: Option<&SiteAddress>) -> Option<Option<String>> {
     static SCHEME: OnceLock<regex::Regex> = OnceLock::new();
     let scheme = SCHEME.get_or_init(|| regex::Regex::new(r"^[A-Za-z][A-Za-z0-9+.-]*:").unwrap());
     // the browser's reading of the attribute: entities first (`&amp;`)
     let value = unescape_entities(written.trim());
+    // a URL written absolute to the site's own address is the same as its root-relative form
+    let value = match own.and_then(|o| o.own_path(&value)) {
+        Some(path) => path,
+        None => value,
+    };
     if value.is_empty()
         || value.starts_with("//")
         || value.starts_with('#')
@@ -242,20 +306,77 @@ mod tests {
     use super::*;
 
     #[test]
+    fn urls_written_absolute_to_the_site_itself_are_checked() {
+        let own = SiteAddress::parse("https://example.com").unwrap();
+        let own = Some(&own);
+        let base = "/books/dune/";
+        for written in [
+            "https://example.com/stocks/KO/",
+            "http://example.com/stocks/KO/",
+            "//example.com/stocks/KO/",
+            "HTTPS://Example.COM/stocks/KO/",
+        ] {
+            assert_eq!(
+                resolve(base, written, own),
+                Some(Some("/stocks/KO/".into())),
+                "{written}"
+            );
+        }
+        assert_eq!(
+            resolve(base, "https://example.com", own),
+            Some(Some("/".into()))
+        );
+        assert_eq!(
+            resolve(base, "https://example.com?x=1", own),
+            Some(Some("/".into()))
+        );
+        assert_eq!(
+            resolve(base, "https://example.com/a.css?v=2", own),
+            Some(Some("/a.css".into()))
+        );
+        for other in [
+            "https://other.example/stocks/KO/",
+            "https://example.com.evil.example/x",
+            "https://sub.example.com/x",
+            "ftp://example.com/x",
+        ] {
+            assert_eq!(resolve(base, other, own), None, "{other}");
+        }
+        // a base_url with a path: only URLs under it are the site's
+        let blog = SiteAddress::parse("https://example.com/blog/").unwrap();
+        let blog = Some(&blog);
+        assert_eq!(
+            resolve(base, "https://example.com/blog/x/", blog),
+            Some(Some("/x/".into()))
+        );
+        assert_eq!(
+            resolve(base, "https://example.com/blog", blog),
+            Some(Some("/".into()))
+        );
+        assert_eq!(resolve(base, "https://example.com/blogroll/", blog), None);
+        assert_eq!(resolve(base, "https://example.com/x/", blog), None);
+        // without base_url, absolute URLs stay another site's
+        assert_eq!(resolve(base, "https://example.com/stocks/KO/", None), None);
+    }
+
+    #[test]
     fn urls_resolve_like_a_browser() {
         let base = "/books/dune/";
-        assert_eq!(resolve(base, "../"), Some(Some("/books/".into())));
-        assert_eq!(resolve(base, "../../index/"), Some(Some("/index/".into())));
+        assert_eq!(resolve(base, "../", None), Some(Some("/books/".into())));
         assert_eq!(
-            resolve(base, "img/a.png?v=2#x"),
+            resolve(base, "../../index/", None),
+            Some(Some("/index/".into()))
+        );
+        assert_eq!(
+            resolve(base, "img/a.png?v=2#x", None),
             Some(Some("/books/dune/img/a.png".into()))
         );
         assert_eq!(
-            resolve(base, "./a.html"),
+            resolve(base, "./a.html", None),
             Some(Some("/books/dune/a.html".into()))
         );
-        assert_eq!(resolve(base, "../../../x"), Some(None));
-        assert_eq!(resolve("/", "/a/../b"), Some(Some("/b".into())));
+        assert_eq!(resolve(base, "../../../x", None), Some(None));
+        assert_eq!(resolve("/", "/a/../b", None), Some(Some("/b".into())));
         for external in [
             "https://x.example/a",
             "mailto:a@b.c",
@@ -267,7 +388,7 @@ mod tests {
             "tel:+1",
             "javascript:void(0)",
         ] {
-            assert_eq!(resolve(base, external), None, "{external}");
+            assert_eq!(resolve(base, external, None), None, "{external}");
         }
         assert_eq!(url_dir(Path::new("books/dune/index.html")), "/books/dune/");
         assert_eq!(url_dir(Path::new("about.html")), "/");

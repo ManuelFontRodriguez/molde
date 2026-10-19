@@ -124,7 +124,7 @@ at the same path. With `base_url`, molde writes `robots.txt` (naming the sitemap
 
 ## What the check covers
 
-Every internal `href`, `src`, `srcset` and CSS `url()` (relative or starting with `/`) resolves to a file; the sitemap
+Every internal `href`, `src`, `srcset` and CSS `url()` (relative, starting with `/`, or absolute to the site's own `base_url`) resolves to a file; the sitemap
 lists exactly the indexable pages; every page has one non-empty, unique `<title>`; the
 canonical, `og:url`, `og:title` and `og:type` are present and the canonical and `og:url`
 match the page; descriptions are present and unique where a route declares them; JSON-LD
