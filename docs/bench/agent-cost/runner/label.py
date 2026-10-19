@@ -98,7 +98,11 @@ def kappa(x, y):
     po = sum(a == b for a, b in zip(x, y)) / n
     px, py = sum(x) / n, sum(y) / n
     pe = px * py + (1 - px) * (1 - py)
-    return 1.0 if pe == 1 else (po - pe) / (1 - pe)
+    return None if pe == 1 else (po - pe) / (1 - pe)  # undefined when every label is the same
+
+
+def fmt(k):
+    return "undefined (every label the same)" if k is None else f"{k:.3f}"
 
 
 def cmd_score(a):
@@ -109,13 +113,13 @@ def cmd_score(a):
     print(f"{len(ids)} messages labelled by everyone ({', '.join(people)})")
     if len(people) >= 2:
         x, y = [labels[people[0]][i] for i in ids], [labels[people[1]][i] for i in ids]
-        print(f"Cohen's kappa {people[0]} vs {people[1]}: {kappa(x, y):.3f}")
+        print(f"Cohen's kappa {people[0]} vs {people[1]}: {fmt(kappa(x, y))}")
     for p in people:
         for rule in ("claimed_done", "claimed_done_lexical"):
             r = [bool(key[i][rule]) for i in ids]
             h = [labels[p][i] for i in ids]
             agree = sum(a == b for a, b in zip(r, h))
-            print(f"{p} vs {rule}: {agree}/{len(ids)} agree, kappa {kappa(h, r):.3f}")
+            print(f"{p} vs {rule}: {agree}/{len(ids)} agree, kappa {fmt(kappa(h, r))}")
 
 
 def main():
