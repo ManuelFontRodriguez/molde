@@ -179,6 +179,16 @@ class T(unittest.TestCase):
         self.assertEqual(m["tool_calls_by_phase"]["docs"], 2)
         self.assertEqual(m["tool_calls_by_phase"]["explore"], 1)
 
+    def test_molde_guide_output_counts_as_docs(self):
+        import metrics
+        self.assertEqual(metrics.phase_of("Bash", {"command": "molde guide"}, "molde check"), "docs")
+        self.assertEqual(metrics.phase_of("Bash", {"command": "cd /work/site && molde guide | head -80"},
+                                          "molde check"), "docs")
+        self.assertEqual(metrics.phase_of("Bash", {"command": "grep guide notes.txt"}, "molde check"), "explore")
+        m = run([init(), call(1, "Bash", {"command": "molde guide"}), res(1, "# molde in five minutes\n..."),
+                 result()])
+        self.assertEqual(m["tool_calls_by_phase"]["docs"], 1)
+
     def test_lexical_claimed_done_is_only_a_sensitivity(self):
         m = run([init(), result(text="Fixed. The check cannot find any problems now.")])
         self.assertTrue(m["claimed_done"])
