@@ -3,7 +3,14 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "molde", version = env!("MOLDE_VERSION"), about)]
+#[command(
+    name = "molde",
+    version = env!("MOLDE_VERSION"),
+    about,
+    after_help = "New to molde? `molde guide` prints a short guide: the site layout, \
+                  routes.yaml, templates and how to read the check report. Then run \
+                  `molde check --site . --out out` before changing anything."
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -84,6 +91,9 @@ enum Cmd {
         #[arg(long, default_value_t = 10)]
         keep: usize,
     },
+    /// Print a short guide to molde for agents and people: the site layout, routes.yaml,
+    /// templates, the check report and the commands (docs/agents.md).
+    Guide,
     /// List every route and its expanded pages as JSON (what the MCP `list_routes` tool returns).
     Routes {
         /// Site folder: routes.yaml, data.json, templates/ (and optional site.yaml, static/, translations/).
@@ -165,6 +175,10 @@ fn main() -> Result<()> {
         Cmd::Gc { out, keep } => {
             let gc = molde::gc_builds(&out, keep)?;
             println!("{}", serde_json::to_string_pretty(&gc)?);
+            Ok(())
+        }
+        Cmd::Guide => {
+            print!("{}", include_str!("../docs/agents.md"));
             Ok(())
         }
         Cmd::Routes { site } => {

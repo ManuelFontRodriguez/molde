@@ -23,6 +23,7 @@ include = [
   "/SECURITY.md",
   "/LICENSE*",
   "/docs/reference.md",
+  "/docs/agents.md",
 ]
 
 [dependencies]

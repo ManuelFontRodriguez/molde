@@ -183,6 +183,10 @@ molde check --site my-site --out out > report.json || {
 
 ## Use it with an agent
 
+Start the agent with `molde guide`. It prints [a short guide](docs/agents.md) (about 2k
+tokens) with the site layout, `routes.yaml`, templates, what the check covers and how
+to read its report. The full [reference](docs/reference.md) is for details.
+
 Register the MCP server with your agent, for example Claude Code:
 
 ```sh
@@ -222,6 +226,7 @@ molde gc     --out O [--keep 10]       # delete old builds, keep the newest N an
 molde serve  --out O [--watch --site S --reload]   # local preview, recheck on save
 molde mcp    --site S --out O          # the agent server (MCP over stdio)
 molde events --site S --out O          # POST /hint -> a verified rebuild
+molde guide                            # a short guide for agents and people
 ```
 
 ## Documentation
