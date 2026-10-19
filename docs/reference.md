@@ -669,6 +669,8 @@ check, plus a `routes` array naming all offenders.
 | `sitemap.noindex_listed` | the sitemap lists a page that carries a robots noindex meta (a hand-written meta on an indexable route) |
 | `canonical.missing` / `.mismatch` / `.not_in_sitemap` | canonical absent / wrong / not in sitemap (`expected`; `found` for `mismatch`; `url` for `not_in_sitemap`). `missing` and `not_in_sitemap` don't apply to `index: false` pages |
 | `og.missing` / `og.mismatch` | titled, indexable route lacks full OG (`property` names the missing tag) / og:url wrong (`found`, `expected`) |
+| `canonical.duplicate` / `og.duplicate` | a page carries a second canonical link, or a second `og:url`, `og:title` or `og:type` (`property`); `found` lists every value in page order. Usually `std_head` plus a hand-written tag. The head checks read the markup only: a tag inside a comment, a script, a style or a `<template>` doesn't count (one inside `<noscript>` does) |
+| `og.title_mismatch` | a page's `og:title` and its `<title>` say different things, compared as a browser shows them (entities decoded, whitespace collapsed, case ignored); one containing the other passes, so an og:title without the title's "\| Brand" suffix is fine (`found` = the og:title, `expected` = the title) |
 | `description.missing` | the route declares `description` but the page's meta description is empty or absent |
 | `description.duplicate` | two indexable pages share a meta description (`description`; `duplicate_of` names the first); per locale, like `titles.duplicate` |
 | `sitemap.lastmod_invalid` | a sitemap page's `lastmod` rendered something other than `YYYY-MM-DD` / RFC 3339 (`lastmod` carries the value) |
@@ -725,13 +727,11 @@ stylesheet's folder), in `<style>` blocks and in `style` attributes. Entities an
 - **`<base href>`.** Relative links are always resolved from the page's own folder; a
   `<base>` element is ignored.
 - **Other URL attributes.** `poster`, `<object data>`, `<form action>`, `<meta
-  http-equiv="refresh">` and URLs a script builds at runtime are not checked. Unquoted
+  http-equiv="refresh">`, URLs in `<meta content>` (an `og:image` or `twitter:image` that
+  names a missing file passes), URLs inside JSON-LD and URLs a script builds at runtime
+  are not checked. Unquoted
   `href=`/`src=` text inside scripts, styles and comments is code, not markup, and is
   skipped (quoted ones are read).
-- **Single-quoted head tags.** The head checks (canonical, Open Graph, description)
-  read double-quoted attribute values only (the robots noindex meta is read in any
-  quoting); molde's own `std_head` always
-  double-quotes. `lang` and `hreflang` accept any quoting.
 - **No layout, CSS or JavaScript.** A page whose styles hide everything, or whose
   script fails, passes. Nothing renders the page.
 - **Content a script adds at runtime** (client-side rendering, a search widget) is

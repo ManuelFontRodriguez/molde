@@ -346,6 +346,14 @@ fn hint_for(check: &str) -> Option<&'static str> {
         "canonical.mismatch" | "og.mismatch" => {
             "a hand-written URL drifted — prefer {{ std_head }}, which derives it from the route"
         }
+        "canonical.duplicate" | "og.duplicate" => {
+            "the page has two of a tag that must be single (`found` lists them) — usually \
+             {{ std_head }} plus one written by hand: remove the hand-written one"
+        }
+        "og.title_mismatch" => {
+            "og:title and <title> say different things — let {{ std_head }} write both from \
+             the route's title, or make the hand-written og:title match"
+        }
         "canonical.not_in_sitemap" => {
             "canonical and sitemap disagree — regenerate both from the route (render {{ std_head }})"
         }

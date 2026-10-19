@@ -125,9 +125,10 @@ at the same path. With `base_url`, molde writes `robots.txt` (naming the sitemap
 ## What the check covers
 
 Every internal `href`, `src`, `srcset` and CSS `url()` (relative, starting with `/`, or absolute to the site's own `base_url`) resolves to a file; the sitemap
-lists exactly the indexable pages; every page has one non-empty, unique `<title>`; the
-canonical, `og:url`, `og:title` and `og:type` are present and the canonical and `og:url`
-match the page; descriptions are present and unique where a route declares them; JSON-LD
+lists exactly the indexable pages; every page has one non-empty, unique `<title>`; indexable
+pages have a canonical and, on routes with a `title`, the Open Graph block; no page has
+two of either; the canonical and `og:url` match the page, and `og:title` doesn't
+contradict the title; descriptions are present and unique where a route declares them; JSON-LD
 parses (and carries the `@type`s a route's `jsonld:` names); nothing is escaped twice;
 noindex pages carry their meta; size budgets hold. Template, data and config errors stop
 the build with the file and, where known, the line.

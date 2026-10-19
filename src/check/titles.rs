@@ -47,6 +47,17 @@ fn without_foreign_titles(html: &str) -> std::borrow::Cow<'_, str> {
     re.replace_all(html, "")
 }
 
+/// The page's title as a browser shows it: the first `<title>` outside SVG, MathML,
+/// comments, scripts and templates, entities decoded, trimmed. None when it is absent or
+/// empty.
+pub(crate) fn page_title(html: &str) -> Option<String> {
+    static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| regex::Regex::new(r"(?is)<title>(.*?)</title>").unwrap());
+    let html = without_foreign_titles(html);
+    let title = crate::check::html::unescape_entities(re.captures(&html)?[1].trim());
+    (!title.is_empty()).then_some(title)
+}
+
 /// `check_titles` with titles.duplicate scoped per locale (see `ScopedFirst`).
 pub(crate) fn check_titles_scoped(
     build_dir: &Path,

@@ -9,11 +9,24 @@ of release may change is in the reference's
 
 ### Added
 
+- New checks: `canonical.duplicate` and `og.duplicate` (a second canonical link, or a
+  second `og:url`, `og:title` or `og:type`, usually a hand-written tag next to
+  `{{ std_head }}`), and `og.title_mismatch` (`og:title` and `<title>` say different
+  things; one containing the other passes). A site that passed may now fail: remove the
+  extra tag, or make the og:title agree with the title.
+- The head checks read the markup only: a canonical or Open Graph tag inside a comment,
+  a script, a style or a `<template>` is no longer taken for the page's own.
 - `molde guide` prints [docs/agents.md](docs/agents.md), a short guide for agents and
   people: the site layout, `routes.yaml`, templates, what the check covers and the
   commands. `molde --help` points to it. Nothing to do: it is new.
 
 ### Changed
+
+- The head checks (canonical, Open Graph, description) read attribute values in any
+  quoting, as browsers do: `'…'` and unquoted as well as `"…"`, with attribute names in
+  any case. A correct head written with single quotes used to fail `canonical.missing`
+  and `og.missing`; it now passes. A single-quoted tag that contradicts `std_head` used
+  to be invisible; it is now checked.
 
 - `links.internal` checks links written absolute to the site's own address. With
   `base_url: https://example.com`, `https://example.com/x/`, `http://example.com/x/` and

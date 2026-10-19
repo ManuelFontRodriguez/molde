@@ -336,3 +336,145 @@ fn text_escaped_twice_is_reported_once_per_page() {
     assert_eq!(report["verdict"], "pass", "{report}");
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// The ids of the head errors, in report order.
+fn ids(errors: &[serde_json::Value]) -> Vec<&str> {
+    errors
+        .iter()
+        .map(|e| e["check"].as_str().unwrap())
+        .collect()
+}
+
+const ONE_PAGE: &str = "routes:\n  - path: /index.html\n    template: p.j2\n    title: Home\n";
+
+#[test]
+fn a_second_canonical_or_og_tag_is_a_duplicate_listing_every_value() {
+    let dir = site(
+        "dup",
+        ONE_PAGE,
+        &[(
+            "p.j2",
+            "<html><head>{{ std_head }}\n<link rel='canonical' href='https://x.example/other/'>\n\
+             <meta property=og:type content=article></head><body>x</body></html>",
+        )],
+    );
+    let errors = head_errors(&dir);
+    assert_eq!(
+        ids(&errors),
+        ["canonical.duplicate", "og.duplicate"],
+        "{errors:?}"
+    );
+    assert_eq!(
+        errors[0]["found"],
+        serde_json::json!(["https://x.example/", "https://x.example/other/"])
+    );
+    assert_eq!(errors[1]["property"], "og:type");
+    assert_eq!(
+        errors[1]["found"],
+        serde_json::json!(["website", "article"])
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn og_title_that_contradicts_the_title_is_a_mismatch() {
+    // one og:title, hand-written, saying something else (entities decoded on both sides)
+    let dir = site(
+        "ogtitle",
+        "routes:\n  - path: /index.html\n    template: p.j2\n",
+        &[(
+            "p.j2",
+            "<html><head><title>A &amp; B</title>\
+             <link rel=\"canonical\" href=\"https://x.example/\">\
+             <meta property=\"og:url\" content=\"https://x.example/\">\
+             <meta property=\"og:title\" content=\"Something else\">\
+             <meta property=\"og:type\" content=\"website\"></head><body>x</body></html>",
+        )],
+    );
+    let errors = head_errors(&dir);
+    assert_eq!(ids(&errors), ["og.title_mismatch"], "{errors:?}");
+    assert_eq!(errors[0]["found"], "Something else");
+    assert_eq!(errors[0]["expected"], "A & B");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn head_tags_are_read_in_any_quoting_and_attribute_case() {
+    // a correct head written by hand with single quotes, unquoted values and upper-case
+    // attribute names passes; before, its tags were invisible and it failed
+    let dir = site(
+        "quoting",
+        ONE_PAGE,
+        &[(
+            "p.j2",
+            "<html><head><title>Home</title>\
+             <link REL='canonical' href='https://x.example/'>\
+             <meta property='og:url' content='https://x.example/'>\
+             <meta Property=og:title content=Home>\
+             <meta property='og:type' content='website'></head><body>x</body></html>",
+        )],
+    );
+    let errors = head_errors(&dir);
+    assert!(errors.is_empty(), "{errors:?}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn head_tags_in_comments_scripts_and_templates_are_not_tags() {
+    let dir = site(
+        "not-tags",
+        ONE_PAGE,
+        &[(
+            "p.j2",
+            "<html><head>{{ std_head }}\n\
+             <!-- <link rel=\"canonical\" href=\"https://old.example/\"> -->\n\
+             <script>var t = '<meta property=\"og:title\" content=\"x\">';</script>\n\
+             <template><link rel=\"canonical\" href=\"https://x.example/a/\"></template>\n\
+             </head><body>x</body></html>",
+        )],
+    );
+    let errors = head_errors(&dir);
+    assert!(errors.is_empty(), "{errors:?}");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn titles_are_compared_as_a_browser_shows_them() {
+    let page = |title: &str, og: &str| {
+        format!(
+            "<html><head><title>{title}</title>\
+             <link rel=\"canonical\" href=\"https://x.example/\">\
+             <meta property=\"og:url\" content=\"https://x.example/\">\
+             <meta property=\"og:title\" content=\"{og}\">\
+             <meta property=\"og:type\" content=\"website\"></head><body>x</body></html>"
+        )
+    };
+    for (title, og) in [
+        ("Page\n   not found &mdash; Demo", "Page not found — Demo"), // whitespace, named entity
+        ("A &amp; B", "A &amp; B"),                                   // entities on both sides
+        ("Dune | Demo library", "Dune"),                              // the brand suffix left out
+        ("It&rsquo;s here", "It’s here"),
+    ] {
+        let dir = site(
+            "shown",
+            "routes:\n  - path: /index.html\n    template: p.j2\n",
+            &[("p.j2", &page(title, og))],
+        );
+        let errors = head_errors(&dir);
+        assert!(errors.is_empty(), "{title:?} / {og:?}: {errors:?}");
+        let _ = fs::remove_dir_all(&dir);
+    }
+    // a contradiction still fails, with both sides as shown
+    let dir = site(
+        "shown-bad",
+        "routes:\n  - path: /index.html\n    template: p.j2\n",
+        &[(
+            "p.j2",
+            &page("Dividend &mdash; stocks", "Dividend calendar"),
+        )],
+    );
+    let errors = head_errors(&dir);
+    assert_eq!(ids(&errors), ["og.title_mismatch"]);
+    assert_eq!(errors[0]["expected"], "Dividend — stocks");
+    let _ = fs::remove_dir_all(&dir);
+}
