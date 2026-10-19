@@ -594,3 +594,21 @@ d410afca38a7b5f3d2a0c985de491ee6493e5d8f92d4d8ddada1f686fff96cf1  agent-cost/tas
 ad9da6c1f725cc95a45bfd251dbf5719be04d3d3100463478adc4f0ecfb7df99  agent-cost/tasks/T8.md
 2152d7528aace38d0a1ff8e735b0b21c3523c57f534f4bd00a4ab70492400d25  agent-cost/tasks/T9.md
 ```
+
+## 19 Oct: round 2A results
+
+All 225 runs done (one pause at the owner's request, after which the one run that had just started was rerun; set `round2a`, image 13e5fb3). 218 pass, 7 fail (T6 ×6, the known conflict with requirement 10; nextjs T10 ×1), no infrastructure failures, no secret in a transcript, no forbidden tool use. `analysis/round2a.py`, as frozen:
+
+- **A1** molde-check-guide ÷ molde-check, new tokens: 0.72 [0.63, 0.82], **holds**.
+- **A2** whole-reference reads on T0, T4, T4b, T10: 0 of 20, **holds**.
+- **A3** new tokens, Holm:
+  - against hugo: 1.01 [0.91, 1.12], does not hold;
+  - against astro: 1.16 [1.09, 1.26], does not hold;
+  - against nextjs: 0.79 [0.72, 0.90], **holds**.
+- **A4** `total_cost_usd`, Holm:
+  - against hugo: 0.91 [0.81, 0.99], **holds**;
+  - against astro: 1.09 [1.02, 1.16], does not hold;
+  - against nextjs: 0.72 [0.66, 0.80], **holds**.
+- **Drift check:** molde-check ÷ hugo, astro, nextjs gives 1.41, 1.61, 1.10, against round 1's 1.34, 1.62, 1.08. All within ±0.2.
+
+**Registration and publication.** Round 2A's registration (commit 13e5fb3, hashes above) was made locally before the run and pushed together with these results; round 1's was public before its campaign. The hashes show the files did not change after the run; they cannot show when they were written beyond the commit's own timestamp. The two smoke runs (set `round2a-smoke`) are excluded.

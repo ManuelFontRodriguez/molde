@@ -1,6 +1,6 @@
 # Agent cost: round 1 report
 
-**Status: DRAFT (19 Oct 2026).** An independent audit has recomputed every number from the raw run data, and its corrections are applied. Still to come before it's final: a human review. Every number here comes from `analyze.py` or `analysis/secondary.py`, run on the published run folders.
+**Status (19 Oct 2026):** round 1 is reported as registered, after an independent audit that recomputed every number. Round 2A, a registered follow-up, is reported in its own section below. Every number here comes from `analyze.py`, `analysis/secondary.py` or `analysis/round2a.py`.
 
 ## The answer, first
 
@@ -10,7 +10,13 @@
 - **H2, safety, is falsified as registered, but uninformative.** No agent claimed done on a broken site on the safety tasks (under P1), in any arm, so the tasks couldn't separate the arms.
 - **H4 holds only for Next.js.** A complete report makes nextjs+checker cheaper than nextjs. It doesn't make molde-check cheaper than molde-build, once H4 is computed over the core tasks as PREDICTIONS.md defines them (T2 included).
 
-**Why.** Most of the extra cost is the agent learning molde from its reference:
+**Then a short guide changed most of it** (round 2A, registered, 225 runs; section below).
+- **The guide:** about 2k tokens, read instead of the 61 KB reference.
+- **Its effect:** it cut molde's cost by 28%. No run read the whole reference any more.
+- **In tokens:** molde with the guide is level with Hugo (1.01), cheaper than Next.js (0.79) and still dearer than Astro (1.16).
+- **At real API cost:** it is cheaper than Hugo (0.91) and Next.js (0.72), and 9% dearer than Astro.
+
+**Why round 1 came out as it did.** Most of the extra cost is the agent learning molde from its reference:
 
 - **Without the docs tokens**, molde-check costs 0.47–0.71× the other tools (registered as "reported", not tested).
 - **The model already knows** Hugo, Astro and Next.js. It has never seen molde.
@@ -26,6 +32,32 @@
 - **molde's changes are about half the size.** An agent's change to a molde site is 0.45–0.63× the lines of the same change to the Hugo, Astro or Next.js site (0.20–0.68× against the hand-written parity ports), in about half as many files. That means less for a person to review.
 - **Priced, the gap is smaller but still there.** At each run's own API cost, molde-check is 0.95–1.46× the others. That's about level with Next.js (0.95, interval [0.86, 1.05]) and dearer than Hugo (1.17) and Astro (1.46). molde's agents write 13–46% fewer output tokens and finish in 0.55–0.92× the time.
 - **Reading once per session would change the picture.** If the docs are read once and the cost is spread over the tasks of a session, molde-check falls below Hugo and Next.js from the second task and reaches Astro's level by the third. That's a projection; round 2 measures it.
+
+## Round 2A: after the short guide (ROUND-2A.md)
+
+After round 1, molde gained a short guide for agents (`molde guide`, about 2k tokens). Round 2A, registered before it ran, tests it: 225 runs.
+- **Arms:** molde-check as in round 1, and molde-check-guide, whose note points to the guide. Both run the same new molde binary.
+- **Controls:** Hugo, Astro and Next.js, re-run at the same time.
+- **Integrity:** 218 pass, 7 fail (6 of them the known T6 conflict), no infrastructure failures, no secret in a transcript.
+
+| Registered prediction | Result | Holds |
+|---|---|---|
+| **A1:** the guide cuts molde's cost (new tokens, core tasks) | **0.72** [0.63, 0.82] (we guessed about 0.6) | yes |
+| **A2:** fewer than 20% of guide runs read the whole reference on T0, T4, T4b, T10 | **0 of 20** (round 1: all) | yes |
+| **A3:** molde with the guide ÷ Hugo / Astro / Next.js, new tokens, Holm | 1.01 [0.91, 1.12] / 1.16 [1.09, 1.26] / **0.79** [0.72, 0.90] | Next.js only; we predicted Hugo too |
+| **A4:** the same at real API cost | **0.91** [0.81, 0.99] / 1.09 [1.02, 1.16] / **0.72** [0.66, 0.80] | Hugo and Next.js |
+
+**What it means.** Most of round 1's gap was molde's documentation, not molde.
+- **With the guide, in tokens:** molde is level with Hugo, cheaper than Next.js, and still dearer than Astro.
+- **In money,** the measure that matters to whoever pays: molde with the guide is cheaper than Hugo and Next.js and 9% dearer than Astro.
+- **Building a site from empty (T0):** 14.1k tokens with the guide, against 35.0k without it, Hugo 14.8k, Astro 12.2k and Next.js 23.3k.
+
+**Caveats:**
+- **Who wrote the guide:** it was written after round 1, by people who had read round 1's transcripts, and it is tested on round 1's tasks.
+- **Registered, but published late:** round 2A was registered locally and is published with its results, unlike round 1, whose registration was public before its campaign.
+- **New checks help both molde arms:** the binary's new checks now report two of T4b's planted defects. Part of T4b's drop, from 35.5k to 10.9k tokens, comes from the checks, though both molde arms have them, so A1 compares like with like.
+- **The guide isn't free everywhere:** on T5 it costs slightly more than reading the reference (11.2k against 9.9k).
+- **No drift:** molde-check without the guide against the incumbents comes out at 1.41, 1.61 and 1.10, against round 1's 1.34, 1.62 and 1.08.
 
 ## What was run
 
@@ -278,10 +310,15 @@ See `ROUND-2.md`. The data sharpens it:
 
 ## Reproducing
 
+The run data (1,515 runs: every run's metrics, verdict, metadata, diff and full agent transcript, without the workspace snapshots) is the release asset [`agent-cost-data-2026-10-19.tar.gz`](https://github.com/ManuelFontRodriguez/molde/releases/tag/agent-cost-data-2026-10-19), 41 MB, SHA-256 `892bcad49c4bead94711408f71119fce61af0fa87f462ae907a2141706173253`. Extract it in this folder, then:
+
 ```
-python3 analyze.py --set campaign-all --prompt P1      # registered H1–H4 (H4 as the script computes it)
+mkdir -p results/campaign-all && for d in results/campaign/*/ results/campaign-mcheck/*/; do
+  ln -s "../$(basename $(dirname $d))/$(basename $d)" results/campaign-all/; done
+python3 analyze.py --set campaign-all --prompt P1      # round 1, registered H1–H4 (H4 as the script computes it)
 python3 analyze.py --set campaign-all --prompt P2
-python3 analysis/secondary.py --set campaign-all       # every secondary table above
+python3 analysis/secondary.py --set campaign-all       # every secondary table, the Sonnet row included
+python3 analysis/round2a.py --set round2a              # round 2A, A1–A4
 ```
 
-`results/campaign-all` holds links to the run folders of `results/campaign` (the registered plan) and `results/campaign-mcheck` (amendment 4). H4 with T2, as PREDICTIONS.md defines it, comes from `analyze.py`'s own functions with the full core task list (see LOG.md, 19 Oct).
+`results/campaign` is the registered plan, `results/campaign-mcheck` amendment 4, `results/robust-sonnet` the Sonnet row and `results/round2a` round 2A. H4 with T2, as PREDICTIONS.md defines it, comes from `analyze.py`'s own functions with the full core task list (see LOG.md, 19 Oct). Reproduced from the archive alone before publishing: the same H1 and A1–A2 numbers as above.
