@@ -1,6 +1,6 @@
 [package]
 name = "molde"
-version = "0.1.0-rc.1"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.89"
 description = "Agent-first static site generator: data and templates in, a verified site and one JSON report out."

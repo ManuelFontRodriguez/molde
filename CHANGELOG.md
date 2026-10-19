@@ -5,7 +5,9 @@ report) is listed here under the release that makes it, with what to do. What ea
 of release may change is in the reference's
 [compatibility](docs/reference.md#compatibility) section.
 
-## Unreleased
+## 0.1.0 — 2026-10-19
+
+The first public release. Since 0.1.0-rc.1:
 
 ### Added
 
