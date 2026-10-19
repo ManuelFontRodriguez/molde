@@ -66,6 +66,18 @@ ARMS = {
                            CHECKER_MOLDE, f"`{MOLDE_DOCS}` (the molde reference)."),
         "docs": "build-only",
     },
+    # Round 2A (ROUND-2A.md): molde-check with one change, the note points to the short
+    # guide (`molde guide`, docs/agents.md) first. Same binary, same reference.
+    "molde-check-guide": {
+        "port": "molde",
+        "bin": {"molde": "molde-full"},
+        "note": molde_note("molde check --site . --out out", "out/current",
+                           "the build command is also the check: `molde check` builds the site, runs molde's checks "
+                           "and prints one JSON report of every problem; it publishes to `out/current` only when all pass.",
+                           "run `molde guide` for a short guide to molde (about 2k tokens); for details, "
+                           f"`{MOLDE_DOCS}` is the full reference."),
+        "docs": "full",
+    },
     "molde-mcp": {
         "port": "molde",
         "bin": {"molde": "molde-full"},

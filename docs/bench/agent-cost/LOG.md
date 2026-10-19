@@ -549,3 +549,48 @@ acec08dc3a66ddee936a473d73e0c853529335d73001100da2cddd8a7d5ac836  agent-cost/tas
   - there were 18 forbidden commands, not 17;
   - minor wording.
 - **Verified as correct:** every count, H1, H2, H3, the diff sizes, the failure causes, the projection and the other secondary numbers.
+
+## 19 Oct: round 2A registered
+
+`ROUND-2A.md` registers a small follow-up to round 1: does pointing the agent at molde's new short guide (`molde guide`, docs/agents.md) reduce molde's cost?
+- **Arms:** `molde-check` and `molde-check-guide` (the same binary; only the note's docs line differs), plus `hugo`, `astro` and `nextjs` as concurrent controls.
+- **Size:** 9 tasks × 5 repetitions = 225 runs, seed 20261020.
+- **Predictions:** A1–A4.
+- **Analysis:** `analysis/round2a.py`, dry-run on round 1's data before any round 2A run. With `molde+checker` standing in for the guide arm, it reproduces round 1's ratios.
+
+**The molde under test** is the stack after rc.1: the guide; links written absolute to the site's own address checked; `canonical.duplicate`, `og.duplicate`, `og.title_mismatch`; head tags read in any quoting and from the markup only; the robots.txt checks. Both molde arms run it.
+- **This changes T4b for molde:** plant 1 (a second single-quoted canonical) is now reported as `canonical.duplicate`, and plant 2 (a contradicting single-quoted og:title) as `og.duplicate`.
+- **`runner/setup.py`'s comment** still describes the T4b plants as invisible to molde's check. That was true for round 1's pinned molde and is no longer true.
+- **H2b is a round 1 hypothesis** about round 1's molde. Round 2A doesn't re-test it, and its T4b numbers are not comparable with round 1's on what the check reports.
+
+**Measurement:** `runner/metrics.py` counts the output of `molde guide` as docs reading (`phase_of`), with a unit test (21/21). No round 1 run called `molde guide`, which didn't exist then.
+
+Frozen (SHA-256, at the commit that adds this entry):
+
+```
+714aea78287290ee9fd48a6c5427f5a8ae8ce769213fcd6b489bfc2866b8dbef  agent-cost/ROUND-2A.md
+4ceede8a28e217e0a237907a5ab029aa19e3d187425f39262fb5b10bec7c3872  agent-cost/analysis/round2a.py
+3e958ea753f908947ca62481255ca2ce9574f5535927acb529bbe1b804bbba6c  agent-cost/runner/round2a-plan.sh
+43e5320857b020564e0ecf98ed4f62c114409fdb43987638548f16a0548a5615  agent-cost/runner/arms.py
+4b7946ac40e0d4f3d8d5b6b5b643c5614594cad6a06c0786b34c5f3c8e177199  agent-cost/runner/metrics.py
+028dcd0307aa0734d352ddebccdced46d9a9e9694ac0738bb98a2c580cebf794  agent-cost/analyze.py
+7e87569eb3656f5b4489f73c859ccea0457c7969f67bb16d3573760af9576960  agent-cost/analysis/secondary.py
+3bb16de1146ccb05f687e261a7d70c0ce645f6a2787dcef62eef1d87e5354dcb  agent-cost/oracle/oracle.py
+48d9c8e0b038ea31bd13fcb519270a4b930cc02ede6d69859ebfdb9eb18d5011  agent-cost/judge/grade.py
+dec04696e5a70f1148b407da7f9ef6f5e7961d86cb1c794abe3823b872571207  agent-cost/judge/browser.js
+274d31be340397ff2c498ee4ed9e5afe5c66dda93c42f9ffcf6f306f6fcd482b  agent-cost/requirements.md
+b75487f87605d202ef4aab8ac0ad1453b09937f9b30f80e1fe5cc2da2e3dadc1  agent-cost/tasks/T0.md
+11e785d22be1c92d3f8d8e7ac8146d858d7590295c56fd447ae3b92a4b703895  agent-cost/tasks/T1.md
+fb1df61162bc69ad8ecbbc42f1c14462d416f4f8fb0887b93df068cc727a45e9  agent-cost/tasks/T10.md
+d1d0b1382702ef8b2b85328f98d9f1bfdc3e48c520aa7478b6648328903cb151  agent-cost/tasks/T11.md
+ef8491ffc4e86588fb32467872b9ba37fcf2ea4d45f4107c1040ec9cfd7188c1  agent-cost/tasks/T12.md
+24ee5a30e905b3d2e15b81366f1fce82f9d36a2903d9e2f27e7e634bdec19ade  agent-cost/tasks/T2.md
+da248299bb6e60d28b8cb65b9429a37b3e800ce5da27791c027e3335ba7a4ae3  agent-cost/tasks/T3.md
+a6e923a06bd72c193ec8024de5adddb3709e75c3d432150644caa42fda5da07a  agent-cost/tasks/T4.md
+a6e923a06bd72c193ec8024de5adddb3709e75c3d432150644caa42fda5da07a  agent-cost/tasks/T4b.md
+d410afca38a7b5f3d2a0c985de491ee6493e5d8f92d4d8ddada1f686fff96cf1  agent-cost/tasks/T5.md
+92aaa3d54dd8ddcf3fb23e0234438a5908af33d216e4e3ec03738a0ba36d8599  agent-cost/tasks/T6.md
+400514319fdad6172cda159fec20f4434e873e5af4009b6ad0db1dc5ddd17d2c  agent-cost/tasks/T7.md
+ad9da6c1f725cc95a45bfd251dbf5719be04d3d3100463478adc4f0ecfb7df99  agent-cost/tasks/T8.md
+2152d7528aace38d0a1ff8e735b0b21c3523c57f534f4bd00a4ab70492400d25  agent-cost/tasks/T9.md
+```

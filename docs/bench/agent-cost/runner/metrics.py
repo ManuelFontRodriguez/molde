@@ -70,7 +70,8 @@ def phase_of(name, inp, build_cmd):
         return "docs" if "molde-reference.md" in inp.get("file_path", "") else "explore"
     if name == "Bash":
         c = inp.get("command", "")
-        if "molde-reference.md" in c:
+        # the reference, or the short guide `molde guide` prints (round 2A)
+        if "molde-reference.md" in c or re.search(r"(^|[\s;&|(])molde\s+guide\b", c):
             return "docs"
         first = build_cmd.split("&&")[-1].strip().split(" ")[:2]
         if re.search(r"(^|[\s;&|(])(molde\s+(check|build)|site-check)\b", c) or (first and " ".join(first) in c):
