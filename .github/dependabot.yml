@@ -7,7 +7,8 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: build
+      # docs/git-conventions.md: dependency bumps are always chore(deps)
+      prefix: chore
       include: scope
   - package-ecosystem: github-actions
     directory: /
@@ -15,3 +16,4 @@ updates:
       interval: monthly
     commit-message:
       prefix: ci
+      include: scope   # ci(deps): the scope is mandatory (pr-policy)
