@@ -1,6 +1,7 @@
 # molde site reference
 
-Everything a site author — human or agent — needs. A site is a folder of pure data (routes,
+Everything a site author — human or agent — needs. For a first look, read the short
+[guide](agents.md) (`molde guide`) instead. A site is a folder of pure data (routes,
 data, templates, and optional static files, settings and translations); the framework
 binary does the rest. If this document and `examples/demo` disagree, that's
 a bug: file it.
@@ -858,6 +859,7 @@ molde events --site S --out O          # POST /hint -> verified rebuild (body ig
              [--port 8081 --min-interval-secs 30]
 molde mcp    --site S --out O          # MCP on stdio: check, list_routes, explain_route,
                                        #   render_page (live preview), diff_build
+molde guide                            # docs/agents.md: a short guide to this reference
 ```
 
 `diff` prints `from`, `to`, `added`, `removed`, `unchanged` and `changed` (per page its

@@ -5,7 +5,15 @@ report) is listed here under the release that makes it, with what to do. What ea
 of release may change is in the reference's
 [compatibility](docs/reference.md#compatibility) section.
 
-## 0.1.0-rc.1 — unreleased
+## Unreleased
+
+### Added
+
+- `molde guide` prints [docs/agents.md](docs/agents.md), a short guide for agents and
+  people: the site layout, `routes.yaml`, templates, what the check covers and the
+  commands. `molde --help` points to it. Nothing to do: it is new.
+
+## 0.1.0-rc.1 — 2026-10-16
 
 The first public release candidate.
 

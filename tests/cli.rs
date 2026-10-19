@@ -26,6 +26,75 @@ fn version_names_the_package_version_and_commit() {
     }
 }
 
+/// `molde guide` is the first thing an agent reads, so it must stay short: whole, it has
+/// to fit in one tool result (agent harnesses save larger outputs to a file and show a
+/// preview, and the agent then reads it twice).
+const GUIDE_MAX_BYTES: usize = 12_000;
+
+#[test]
+fn guide_prints_the_agents_guide_and_stays_short() {
+    let out = Command::new(env!("CARGO_BIN_EXE_molde"))
+        .arg("guide")
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let printed = String::from_utf8(out.stdout).unwrap();
+    let file = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("docs/agents.md"),
+    )
+    .unwrap();
+    assert_eq!(printed, file);
+    assert!(
+        printed.len() <= GUIDE_MAX_BYTES,
+        "docs/agents.md is {} bytes; keep it under {GUIDE_MAX_BYTES} and move detail to the reference",
+        printed.len()
+    );
+}
+
+#[test]
+fn the_guide_ships_in_the_package() {
+    // `molde guide` compiles the file in (include_str!), so a package without it
+    // doesn't build: cargo install and cargo publish would fail
+    let manifest = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"),
+    )
+    .unwrap();
+    assert!(
+        manifest.contains("\"/docs/agents.md\""),
+        "add /docs/agents.md to `include` in Cargo.toml"
+    );
+}
+
+#[test]
+fn every_command_the_guide_shows_exists() {
+    let guide = include_str!("../docs/agents.md");
+    let help = String::from_utf8(
+        Command::new(env!("CARGO_BIN_EXE_molde"))
+            .arg("--help")
+            .output()
+            .unwrap()
+            .stdout,
+    )
+    .unwrap();
+    let commands: Vec<&str> = guide
+        .lines()
+        .filter_map(|l| l.trim_start().strip_prefix("molde "))
+        .filter_map(|rest| rest.split_whitespace().next())
+        .collect();
+    assert!(commands.len() >= 7, "{commands:?}");
+    for c in commands {
+        assert!(
+            help.lines()
+                .any(|l| l.trim_start().starts_with(&format!("{c} "))),
+            "the guide shows `molde {c}`, which `molde --help` doesn't list"
+        );
+    }
+    assert!(
+        help.contains("molde guide"),
+        "--help should point to the guide"
+    );
+}
+
 fn demo_site() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/demo")
 }
