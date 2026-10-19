@@ -597,7 +597,7 @@ ad9da6c1f725cc95a45bfd251dbf5719be04d3d3100463478adc4f0ecfb7df99  agent-cost/tas
 
 ## 19 Oct: round 2A results
 
-All 225 runs done (one pause at the owner's request, after which the one run that had just started was rerun; set `round2a`, image 13e5fb3). 218 pass, 7 fail (T6 ×6, the known conflict with requirement 10; nextjs T10 ×1), no infrastructure failures, no secret in a transcript, no forbidden tool use. `analysis/round2a.py`, as frozen:
+All 225 runs done (one pause at the owner's request, after which the one run that had just started was rerun; set `round2a`; the images were built from the registration commit, local id 13e5fb3, and are tagged with it). 218 pass, 7 fail (T6 ×6, the known conflict with requirement 10; nextjs T10 ×1), no infrastructure failures, no secret in a transcript, no forbidden tool use. `analysis/round2a.py`, as frozen:
 
 - **A1** molde-check-guide ÷ molde-check, new tokens: 0.72 [0.63, 0.82], **holds**.
 - **A2** whole-reference reads on T0, T4, T4b, T10: 0 of 20, **holds**.
@@ -611,4 +611,4 @@ All 225 runs done (one pause at the owner's request, after which the one run tha
   - against nextjs: 0.72 [0.66, 0.80], **holds**.
 - **Drift check:** molde-check ÷ hugo, astro, nextjs gives 1.41, 1.61, 1.10, against round 1's 1.34, 1.62, 1.08. All within ±0.2.
 
-**Registration and publication.** Round 2A's registration (commit 13e5fb3, hashes above) was made locally before the run and pushed together with these results; round 1's was public before its campaign. The hashes show the files did not change after the run; they cannot show when they were written beyond the commit's own timestamp. The two smoke runs (set `round2a-smoke`) are excluded.
+**Registration and publication.** Round 2A's registration (hashes above) was committed locally at 14:11 UTC, three minutes before the first run (14:14 UTC). It was pushed together with these results, as the first of the two commits of PR #35 (author date kept through rebasing; the merge squashes them, but the PR keeps both); round 1's was public before its campaign. The hashes show the files did not change after the run; they cannot show when they were written beyond the commit's own timestamp. The two smoke runs (set `round2a-smoke`) are excluded.
