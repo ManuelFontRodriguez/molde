@@ -386,3 +386,45 @@ fn file_manager_litter_in_static_is_not_shipped() {
     assert!(report.build_dir.join("img/logo.png").is_file());
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn robots_txt_must_name_the_sitemap_and_let_crawlers_in() {
+    let robots_errors = |dir: &std::path::Path| -> Vec<String> {
+        let report = molde::run_check(dir, &dir.join("out")).unwrap();
+        report["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["check"].as_str().unwrap().starts_with("robots."))
+            .map(|e| e["check"].as_str().unwrap().to_string())
+            .collect()
+    };
+    // molde's own robots.txt passes
+    let dir = site("robots-own");
+    assert!(robots_errors(&dir).is_empty());
+    let _ = fs::remove_dir_all(&dir);
+
+    // a static one that forgets the sitemap, and a staging one that shuts everyone out
+    let dir = site("robots-static");
+    fs::create_dir_all(dir.join("static")).unwrap();
+    fs::write(
+        dir.join("static/robots.txt"),
+        "User-agent: *\nAllow: /\nSitemap: https://x.example/old.xml\n",
+    )
+    .unwrap();
+    assert_eq!(robots_errors(&dir), ["robots.sitemap_missing"]);
+    fs::write(
+        dir.join("static/robots.txt"),
+        "# staging\nuser-agent: *\ndisallow: /\n\nsitemap: https://x.example/sitemap.xml\n",
+    )
+    .unwrap();
+    assert_eq!(robots_errors(&dir), ["robots.blocks_all"]);
+    // a site that stays out of search on purpose: every page `index: false`
+    fs::write(
+        dir.join("routes.yaml"),
+        "routes:\n  - path: /index.html\n    template: i.j2\n    title: Home\n    index: false\n",
+    )
+    .unwrap();
+    assert!(robots_errors(&dir).is_empty());
+    let _ = fs::remove_dir_all(&dir);
+}
