@@ -20,6 +20,10 @@ request titles and descriptions follow [docs/git-conventions.md](docs/git-conven
   and macOS (macOS is the case-insensitive file system), builds with the oldest supported
   Rust (`rust-version` in `Cargo.toml`) and runs the `cargo deny` licence and advisory
   audit. A newer push to a pull request cancels the older run.
+- **The `pr-policy` check reads the PR title.** The title is the squash commit, and its type
+  says what kind of release the change needs. A new check id or a stricter check is `feat`,
+  never `fix`, and a `feat`/`fix` in `src/check/` comes with its CHANGELOG entry (see
+  [docs/git-conventions.md](docs/git-conventions.md#what-ci-checks)).
 - **A failure is something to fix, not to re-run.** Re-run a job only after a GitHub-side
   problem (a runner that never started), and say so.
 - **When you change a workflow,** run `actionlint` locally first.

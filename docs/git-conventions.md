@@ -49,6 +49,7 @@ refactor(serve): bound the settle loop against continuously-changing files
 | `perf`     | Performance improvement                      |
 | `build`    | Build system config (Cargo profile, packaging) — NOT dep bumps |
 | `revert`   | Reverting a previous commit                  |
+| `bench`    | A benchmark under `docs/bench/` (design, runs, results) |
 
 ### Scope
 
@@ -57,6 +58,22 @@ The scope is **mandatory**. Common scopes are the areas of the codebase:
 `templates`, `deps`. The list is **open** — when none fits, use the file or
 topic the change touches: `ci(ci.yml)`, `docs(git)`, `chore(gitignore)`.
 Never omit it, never leave it empty.
+
+## What CI checks
+
+The `pr-policy` workflow checks every pull request's title against its diff
+(`.github/scripts/pr_policy.py`; retitling a PR reruns it):
+
+1. The title is `type(scope): description`, with `!` before the colon for a breaking
+   change, and a type from the table above. A release PR is titled `molde X.Y.Z`.
+2. A `feat` or `fix` that changes `src/check/` also changes `CHANGELOG.md`: the check
+   report is a contract, and its entry says what to do. A `refactor` or `perf` needs no
+   entry, because it may not change a report (AGENTS.md).
+3. A PR that adds a check id is `feat` (or breaking): new ids arrive in minor releases.
+4. A check that got stricter is `feat`, not `fix`. If the CHANGELOG entry of a `fix` says a
+   site "now fails", the check fails the PR. A patch release never makes a passing site fail
+   ([compatibility](reference.md#compatibility)). Word such entries that way, so the check
+   can see them.
 
 ## PR Title Format
 
