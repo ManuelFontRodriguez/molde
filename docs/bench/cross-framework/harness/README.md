@@ -35,6 +35,10 @@ dataset, plus `molde check` on both. Results print per row and land in
 - `sites/<framework>/` — the authored sources for each port, each with a
   `BUILD.md` recording exact versions, commands, and the tricks that row
   needed. These are the files counted in report.md's "Authored" row.
+  Their lockfiles (`package-lock.json`) are pinned on purpose, so that a re-run measures
+  the exact versions the report names. Dependabot's security alerts on them are
+  dismissed as "not used": they are installed only inside the benchmark, never in molde
+  or its release. Upgrading one means re-measuring that row.
 - `run.py` — the orchestrator described above (`BENCH_RUNS` sets the runs per cell).
 
 ## Reading the numbers
