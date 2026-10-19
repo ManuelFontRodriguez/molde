@@ -144,7 +144,7 @@ my-site --reload` rechecks on every save and refreshes the browser when a build 
 
 | Area | Checks |
 |---|---|
-| Links | every `href`, `src`, `srcset` and CSS `url()` that points inside the site resolves to a file (`links.internal`) |
+| Links | every `href`, `src`, `srcset` and CSS `url()` that points inside the site, relative, root-relative or absolute to its own address, resolves to a file (`links.internal`) |
 | Titles and descriptions | present, single, not duplicated across pages (`titles.*`, `description.*`) |
 | Search engines | `sitemap.xml` matches the indexable pages and has valid dates; canonical, Open Graph and robots tags (`sitemap.*`, `canonical.missing`, `og.missing`, `robots.missing`) |
 | Structured data | JSON-LD parses and carries the `@type`s a route promises (`jsonld.*`) |

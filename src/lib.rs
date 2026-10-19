@@ -39,7 +39,7 @@ pub mod testing {
     pub use crate::build::render_site;
     pub use crate::check::budgets::glob_regex;
     pub use crate::check::head::check_head;
-    pub use crate::check::links::check_links;
+    pub use crate::check::links::{check_links, check_links_for};
     pub use crate::check::paths::check_duplicate_paths;
     pub use crate::check::sitemap::{check_sitemap, check_sitemap_at};
     pub use crate::check::titles::check_titles;

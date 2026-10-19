@@ -13,6 +13,14 @@ of release may change is in the reference's
   people: the site layout, `routes.yaml`, templates, what the check covers and the
   commands. `molde --help` points to it. Nothing to do: it is new.
 
+### Changed
+
+- `links.internal` checks links written absolute to the site's own address. With
+  `base_url: https://example.com`, `https://example.com/x/`, `http://example.com/x/` and
+  `//example.com/x/` are links into the build, checked like `/x/`; before, they were
+  taken for another site and never checked. A site with such a link to a missing page
+  now fails: fix the link the report names. Other hosts are still not fetched.
+
 ## 0.1.0-rc.1 — 2026-10-16
 
 The first public release candidate.
