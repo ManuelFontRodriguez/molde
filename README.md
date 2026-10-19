@@ -158,6 +158,22 @@ along with [what the checks do not see](docs/reference.md#what-the-checks-do-not
 they read structure, not meaning. [examples/broken](examples/broken) shows a report for
 five typical mistakes.
 
+### A check, not a linter
+
+A linter such as ESLint reads your source code, one file at a time, for patterns and style.
+`molde check` reads what you ship: the built site, all of it at once.
+- **Many site bugs exist in no source file.** A link breaks because a slug in `data.json`
+  changed, or two pages get the same title because two items share a name: every template
+  is correct, and only the output is wrong.
+- **What it checks belongs to the whole build:** the sitemap lists exactly the indexable
+  pages, no two pages share a title, every canonical matches its page. A linter, or an
+  HTML validator that checks one page at a time, can't see these.
+- **It works like a test of the release:** a build that fails isn't published. Each error
+  still points back to the source, by the route and template that made the page.
+
+Use both: a linter keeps the code clean, and the check tells you the site you are about to
+publish is right.
+
 ## In CI or a script
 
 `molde check` exits 0 when every check passes and the build is published, 1 when a check
