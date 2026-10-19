@@ -16,6 +16,10 @@ of release may change is in the reference's
   extra tag, or make the og:title agree with the title.
 - The head checks read the markup only: a canonical or Open Graph tag inside a comment,
   a script, a style or a `<template>` is no longer taken for the page's own.
+- New checks on `robots.txt`, with `base_url`: `robots.sitemap_missing` (no `Sitemap:`
+  line naming `<base_url>/sitemap.xml`) and `robots.blocks_all` (`User-agent: *` with
+  `Disallow: /` on a site with pages to index). molde's own robots.txt passes both; a `static/robots.txt`, which
+  replaces it, is now checked the same way.
 - `molde guide` prints [docs/agents.md](docs/agents.md), a short guide for agents and
   people: the site layout, `routes.yaml`, templates, what the check covers and the
   commands. `molde --help` points to it. Nothing to do: it is new.

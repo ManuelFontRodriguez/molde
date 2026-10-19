@@ -120,7 +120,8 @@ minijinja, the Rust Jinja2 dialect. In a template:
 
 Copied as is (`static/style.css` is `/style.css`). A route always wins over a static file
 at the same path. With `base_url`, molde writes `robots.txt` (naming the sitemap) and
-`sitemap.xml` itself; a `static/robots.txt` replaces the generated one.
+`sitemap.xml` itself; a `static/robots.txt` replaces the generated one and must still
+name the sitemap.
 
 ## What the check covers
 
@@ -130,7 +131,8 @@ pages have a canonical and, on routes with a `title`, the Open Graph block; no p
 two of either; the canonical and `og:url` match the page, and `og:title` doesn't
 contradict the title; descriptions are present and unique where a route declares them; JSON-LD
 parses (and carries the `@type`s a route's `jsonld:` names); nothing is escaped twice;
-noindex pages carry their meta; size budgets hold. Template, data and config errors stop
+noindex pages carry their meta; robots.txt names the sitemap and lets crawlers in; size
+budgets hold. Template, data and config errors stop
 the build with the file and, where known, the line.
 
 **It doesn't read meaning:** a wrong value in the text, a hard-coded string that should

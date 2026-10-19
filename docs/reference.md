@@ -35,7 +35,10 @@ are the site's source of truth. The link check covers `src="…"` as well as `hr
 so a template referencing a missing asset fails the build.
 
 With `base_url` set, a `robots.txt` pointing at the sitemap is emitted automatically;
-ship your own `static/robots.txt` to override it.
+ship your own `static/robots.txt` to override it. Yours is checked like molde's: it must
+name `<base_url>/sitemap.xml` in a `Sitemap:` line (`robots.sitemap_missing`), and its
+`User-agent: *` rules must not disallow `/` with nothing allowed back while the site
+has pages to index (`robots.blocks_all`).
 
 `static/*.html` files are not routes, so they are **never in the sitemap**. With
 `base_url` set, a static HTML page passes `sitemap.missing_page` only if it carries
@@ -686,6 +689,8 @@ check, plus a `routes` array naming all offenders.
 | `translations.missing` / `.extra` / `.args` | a locale's file lacks (or leaves empty) a default-locale key / has a key the default doesn't / uses different `{placeholders}` (`locale`, `key`; `expected` and `found` for `.args`). `layer: translations` |
 | `translations.unknown_key` | a template called `t()` with a key the default locale doesn't define; it rendered empty. One entry per key and template (`key`, `locales`, and `template`, or `source` for a routes.yaml pattern) |
 | `html.double_escaped` | text escaped twice shows as `&amp;` (or `&lt;`, …) in the browser, e.g. `Pride &amp;amp; Prejudice` in the HTML: usually data that is already HTML-escaped, or a hand-written `replace("&", "&amp;")`, escaped again by autoescape. One error per page (`found`, `context`, `count`). `<pre>`, `<code>`, `<textarea>`, scripts, styles and comments are not checked |
+| `robots.sitemap_missing` | with `base_url`, the build's `robots.txt` (usually a `static/robots.txt`, which replaces molde's) has no `Sitemap:` line naming `<base_url>/sitemap.xml` (`file`, `expected`, `found` = the Sitemap lines it has) |
+| `robots.blocks_all` | with `base_url` and at least one indexable page, the build's `robots.txt` shuts every crawler out: the rules for `User-agent: *` (every such group, merged) have `Disallow: /` and no non-empty `Allow` (`file`). Read as RFC 9309 reads it. A site whose pages are all `index: false` may block crawlers |
 | `robots.missing` | an `index: false` page lacks `<meta name="robots" content="noindex">` (template doesn't render `{{ std_head }}`) |
 | `template.syntax` | a template does not parse (`template`, `line`, `message`; `page`/`route` of the first page that used it). `layer: source`, `build: null` |
 | `template.render` | a page failed while rendering: an attribute of an undefined value, a filter error, a localized field printed without `\| loc`, a `date_format` in a locale without data… (`page`, `route`, `template`, `line` when known, `message` with the whole cause). `layer: source`, `build: null` |

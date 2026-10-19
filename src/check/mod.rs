@@ -5,6 +5,7 @@ pub(crate) mod html;
 pub(crate) mod jsonld;
 pub(crate) mod links;
 pub(crate) mod paths;
+pub(crate) mod robots;
 pub(crate) mod sitemap;
 pub(crate) mod titles;
 
@@ -113,6 +114,11 @@ fn output_layer_errors(
         build_dir,
         pages,
         site.config.base_url.as_deref(),
+    )?);
+    errors.extend(robots::check_robots(
+        build_dir,
+        site.config.base_url.as_deref(),
+        pages.iter().any(|p| p.in_sitemap()),
     )?);
     errors.extend(check_head(build_dir, site, pages)?);
     errors.extend(check_jsonld(build_dir, site, pages)?);
@@ -345,6 +351,15 @@ fn hint_for(check: &str) -> Option<&'static str> {
         "canonical.missing" => "render {{ std_head }} inside <head>",
         "canonical.mismatch" | "og.mismatch" => {
             "a hand-written URL drifted — prefer {{ std_head }}, which derives it from the route"
+        }
+        "robots.sitemap_missing" => {
+            "robots.txt doesn't name the sitemap — a static/robots.txt replaces the one molde \
+             writes; add `Sitemap: <expected>` to it, or delete it to get molde's"
+        }
+        "robots.blocks_all" => {
+            "robots.txt shuts every crawler out (`User-agent: *` + `Disallow: /`) while the \
+             sitemap lists pages to index — usually a staging robots.txt; remove the rule, or \
+             set the pages `index: false` if the site must stay out of search"
         }
         "canonical.duplicate" | "og.duplicate" => {
             "the page has two of a tag that must be single (`found` lists them) — usually \
