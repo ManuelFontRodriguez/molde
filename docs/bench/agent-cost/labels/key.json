@@ -1,0 +1,246 @@
+{
+ "seed": 20261018,
+ "set": "campaign-all",
+ "key": {
+  "m001": {
+   "run_id": "20261018T174824Z-parity-zola-T2-P1-r5-92ab16",
+   "arm": "parity-zola",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m002": {
+   "run_id": "20261018T174121Z-hugo-T11-P1-r2-5202ba",
+   "arm": "hugo",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m003": {
+   "run_id": "20261017T094549Z-astro-T1-P2-r4-108223",
+   "arm": "astro",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m004": {
+   "run_id": "20261018T192758Z-astro+checker-T2-P1-r3-df5f2e",
+   "arm": "astro+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m005": {
+   "run_id": "20261018T150216Z-parity-nextjs-T3-P1-r4-305463",
+   "arm": "parity-nextjs",
+   "claimed_done": true,
+   "claimed_done_lexical": false
+  },
+  "m006": {
+   "run_id": "20261016T204530Z-molde-build-T3-P1-r9-40fbb7",
+   "arm": "molde-build",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m007": {
+   "run_id": "20261018T173832Z-molde-build-T2-P1-r2-6c58d1",
+   "arm": "molde-build",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m008": {
+   "run_id": "20261018T145427Z-nextjs-T11-P1-r1-75d1ef",
+   "arm": "nextjs",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m009": {
+   "run_id": "20261016T204452Z-astro-T12-P1-r1-6e9d90",
+   "arm": "astro",
+   "claimed_done": true,
+   "claimed_done_lexical": false
+  },
+  "m010": {
+   "run_id": "20261018T174803Z-molde-check-T3-P1-r1-4e58c5",
+   "arm": "molde-check",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m011": {
+   "run_id": "20261018T153941Z-hugo+checker-T4b-P1-r15-3dcac4",
+   "arm": "hugo+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m012": {
+   "run_id": "20261017T103622Z-molde-build-T6-P1-r5-efeda3",
+   "arm": "molde-build",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m013": {
+   "run_id": "20261017T085320Z-parity-eleventy-T6-P1-r1-4fa576",
+   "arm": "parity-eleventy",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m014": {
+   "run_id": "20261018T174922Z-nextjs+checker-T1-P1-r5-231dd4",
+   "arm": "nextjs+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m015": {
+   "run_id": "20261018T162402Z-nextjs-T1-P2-r1-8172fe",
+   "arm": "nextjs",
+   "claimed_done": true,
+   "claimed_done_lexical": false
+  },
+  "m016": {
+   "run_id": "20261018T163724Z-parity-astro-T5-P1-r4-0a4467",
+   "arm": "parity-astro",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m017": {
+   "run_id": "20261018T194300Z-parity-hugo-T3-P1-r1-a659ff",
+   "arm": "parity-hugo",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m018": {
+   "run_id": "20261017T092439Z-hugo+checker-T7-P1-r1-a602da",
+   "arm": "hugo+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m019": {
+   "run_id": "20261018T144650Z-nextjs+checker-T7-P1-r2-50aad5",
+   "arm": "nextjs+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m020": {
+   "run_id": "20261017T104931Z-astro+checker-T4-P1-r2-0fcfdc",
+   "arm": "astro+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m021": {
+   "run_id": "20261019T104533Z-molde+checker-T3-P1-r5-afeb3c",
+   "arm": "molde+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m022": {
+   "run_id": "20261016T212441Z-parity-hugo-T2-P1-r3-0ea1c3",
+   "arm": "parity-hugo",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m023": {
+   "run_id": "20261017T103209Z-nextjs+checker-T7-P1-r3-9959e6",
+   "arm": "nextjs+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m024": {
+   "run_id": "20261019T102046Z-molde+checker-T7-P1-r1-2262d6",
+   "arm": "molde+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m025": {
+   "run_id": "20261017T104649Z-astro+checker-T4b-P1-r13-6a1ab4",
+   "arm": "astro+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m026": {
+   "run_id": "20261018T135955Z-hugo-T4-P1-r5-d3203d",
+   "arm": "hugo",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m027": {
+   "run_id": "20261018T170703Z-hugo-T10-P1-r4-6efcc7",
+   "arm": "hugo",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m028": {
+   "run_id": "20261018T164337Z-molde-check-T8-P1-r4-30f52d",
+   "arm": "molde-check",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m029": {
+   "run_id": "20261018T193425Z-molde-mcp-T3-P1-r5-b9de47",
+   "arm": "molde-mcp",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m030": {
+   "run_id": "20261016T213848Z-astro-T9-P1-r4-cb80a0",
+   "arm": "astro",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m031": {
+   "run_id": "20261018T142854Z-molde-mcp-T2-P1-r5-17955f",
+   "arm": "molde-mcp",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m032": {
+   "run_id": "20261016T211823Z-parity-zola-T5-P1-r2-805acd",
+   "arm": "parity-zola",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m033": {
+   "run_id": "20261018T143652Z-parity-eleventy-T3-P1-r5-08914e",
+   "arm": "parity-eleventy",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m034": {
+   "run_id": "20261018T142401Z-molde-mcp-T6-P1-r1-828de8",
+   "arm": "molde-mcp",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m035": {
+   "run_id": "20261018T153033Z-hugo+checker-T11-P1-r2-880be8",
+   "arm": "hugo+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m036": {
+   "run_id": "20261019T100923Z-molde+checker-T2-P1-r2-00e556",
+   "arm": "molde+checker",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m037": {
+   "run_id": "20261016T202039Z-parity-astro-T1-P1-r3-ca1c81",
+   "arm": "parity-astro",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m038": {
+   "run_id": "20261016T210005Z-nextjs-T0-P1-r1-e85133",
+   "arm": "nextjs",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m039": {
+   "run_id": "20261018T161610Z-molde-check-T4b-P1-r14-77b79e",
+   "arm": "molde-check",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  },
+  "m040": {
+   "run_id": "20261018T144931Z-parity-nextjs-T3-P1-r3-8a3a38",
+   "arm": "parity-nextjs",
+   "claimed_done": true,
+   "claimed_done_lexical": true
+  }
+ }
+}

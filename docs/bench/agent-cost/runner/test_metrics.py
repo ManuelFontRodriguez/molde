@@ -168,6 +168,17 @@ class T(unittest.TestCase):
                  res(1, '{"verdict": "pass"}'), result()], arm="molde-build")
         self.assertTrue(m["forbidden_tool_use"])
 
+    def test_sections_of_a_saved_docs_output_are_docs(self):
+        p = "/home/bench/.claude/projects/-work-site/s1/tool-results/b1.txt"
+        m = run([init(), call(1, "Bash", {"command": "cat /work/context/molde-reference.md"}),
+                 res(1, f"<persisted-output>\nOutput too large (46.6KB). Full output saved to: {p}\n\n"
+                        "Preview:\n# molde reference\n\nEverything a site author needs"),
+                 call(2, "Bash", {"command": f"sed -n '/## routes.yaml/,/## Locales/p' {p}"}),
+                 res(2, "## routes.yaml\n..."),
+                 call(3, "Bash", {"command": "grep -n stocks data.json"}), res(3, "3: stocks"), result()])
+        self.assertEqual(m["tool_calls_by_phase"]["docs"], 2)
+        self.assertEqual(m["tool_calls_by_phase"]["explore"], 1)
+
     def test_lexical_claimed_done_is_only_a_sensitivity(self):
         m = run([init(), result(text="Fixed. The check cannot find any problems now.")])
         self.assertTrue(m["claimed_done"])

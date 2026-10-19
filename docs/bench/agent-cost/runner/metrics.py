@@ -37,6 +37,7 @@ LIMIT_NOTICE = re.compile(r"(?i)(usage limit|hit your limit|limit reached).{0,12
 CENSOR_SUBTYPES = ("error_max_turns", "error_max_budget_usd")   # caps: censored, never re-run
 MIN_PROGRESS_TURNS = 3
 DOCS_FINGERPRINT = "Everything a site author"   # the molde reference's first sentence
+SAVED_TO = re.compile(r"saved to: (/[^\s\\'\"]+/tool-results/[^\s\\'\"]+)")  # a persisted large output
 # A shell command that changes files (agents often edit with sed -i or a heredoc instead of
 # the Edit tool). Redirections to /dev/null and to stderr don't count.
 BASH_EDIT = re.compile(r"(\bsed\s+(-[a-zA-Z]*i|--in-place)|\bperl\s+-[a-zA-Z]*i|\btee\b|\bpatch\b|\bgit\s+(apply|checkout|restore)\b"
@@ -170,16 +171,32 @@ def main():
                     docs_ids.add(b.get("id"))
     # A docs read can also arrive under another name: a large `cat` of the reference is
     # saved by Claude Code to a tool-results file, which the agent then Reads. Such a result
-    # is recognised by the reference's own opening text, and counted as docs.
+    # is recognised by the reference's own opening text, and counted as docs. Any later call
+    # that names that saved file (a `sed` or `grep` of sections of it) reads the docs too.
+    saved, phase_by_id = set(), {}
     for e in events:
+        if e.get("type") == "assistant":
+            for b in (e.get("message") or {}).get("content", []) or []:
+                if isinstance(b, dict) and b.get("type") == "tool_use":
+                    inp = b.get("input") or {}
+                    phase_by_id[b.get("id")] = phase_of(b.get("name", ""), inp, build_cmd)
+                    if b.get("id") not in docs_ids and any(p in json.dumps(inp) for p in saved):
+                        docs_ids.add(b.get("id"))
+                        phases[phase_by_id[b.get("id")]] -= 1
+                        phases["docs"] += 1
+            continue
         if e.get("type") != "user":
             continue
         for b in (e.get("message") or {}).get("content", []) or []:
-            if isinstance(b, dict) and b.get("type") == "tool_result" and b.get("tool_use_id") not in docs_ids:
+            if isinstance(b, dict) and b.get("type") == "tool_result":
                 c = b.get("content")
-                if DOCS_FINGERPRINT in (c if isinstance(c, str) else json.dumps(c)):
+                c = c if isinstance(c, str) else json.dumps(c)
+                if DOCS_FINGERPRINT not in c:
+                    continue
+                saved.update(SAVED_TO.findall(c))
+                if b.get("tool_use_id") not in docs_ids:
                     docs_ids.add(b.get("tool_use_id"))
-                    phases["explore"] -= 1
+                    phases[phase_by_id.get(b.get("tool_use_id"), "explore")] -= 1
                     phases["docs"] += 1
     m["tool_calls_by_phase"] = phases
     pending, docs_est, seen_msgs = None, 0.0, set()
