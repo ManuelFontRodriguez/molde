@@ -138,7 +138,7 @@ fn duplicate_errors(html: &str, rel: &str) -> Vec<serde_json::Value> {
 
 /// The page without its comments, scripts, styles and `<template>` contents: what a
 /// crawler reads as the document's markup.
-fn markup_only(html: &str) -> String {
+pub(crate) fn markup_only(html: &str) -> String {
     static TEMPLATE: OnceLock<regex::Regex> = OnceLock::new();
     let template =
         TEMPLATE.get_or_init(|| regex::Regex::new(r"(?is)<template\b.*?</template\s*>").unwrap());
@@ -150,7 +150,7 @@ fn markup_only(html: &str) -> String {
 /// Text as a browser shows it, for comparing a title with an og:title. Both come in with
 /// the basic entities already decoded (`tag_attr`, `page_title`); this adds the common
 /// named ones and collapses runs of whitespace.
-fn shown_text(s: &str) -> String {
+pub(crate) fn shown_text(s: &str) -> String {
     let mut t = s.to_string();
     for (entity, ch) in [
         ("&nbsp;", " "),
@@ -325,7 +325,7 @@ fn description_errors(
 /// None: no such tag; Some(None): the tag has no `want`. Attribute names and the `key`
 /// value are matched case-insensitively, and values may be double-quoted, single-quoted
 /// or unquoted, as browsers read them.
-fn tag_attr(
+pub(crate) fn tag_attr(
     html: &str,
     tag_re: &regex::Regex,
     key: &str,
@@ -339,7 +339,13 @@ fn tag_attr(
 
 /// The `want` value of every tag `tag_attr` would consider, in page order (tags without
 /// `want` are left out).
-fn tag_attrs(html: &str, tag_re: &regex::Regex, key: &str, val: &str, want: &str) -> Vec<String> {
+pub(crate) fn tag_attrs(
+    html: &str,
+    tag_re: &regex::Regex,
+    key: &str,
+    val: &str,
+    want: &str,
+) -> Vec<String> {
     tag_re
         .find_iter(html)
         .filter_map(|m| tag_match(m.as_str(), key, val, want).flatten())

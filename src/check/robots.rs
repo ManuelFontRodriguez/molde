@@ -51,7 +51,7 @@ pub fn check_robots(
 
 /// The file's `key: value` lines, keys lower-cased: a byte order mark, `#` comments,
 /// blank lines and lines without a colon are dropped; CRLF ends a line like LF.
-fn parse(text: &str) -> Vec<(String, String)> {
+pub(crate) fn parse(text: &str) -> Vec<(String, String)> {
     text.trim_start_matches('\u{feff}')
         .lines()
         .filter_map(|line| {
@@ -75,7 +75,7 @@ fn same_url(a: &str, b: &str) -> bool {
 /// Do the rules for every crawler disallow the whole site? RFC 9309 merges every group
 /// that names `*`: `Disallow: /` (or `/*`) in them, and no non-empty `Allow` in them
 /// (any `Allow` opens part of the site again).
-fn blocks_everyone(lines: &[(String, String)]) -> bool {
+pub(crate) fn blocks_everyone(lines: &[(String, String)]) -> bool {
     let (mut agents, mut in_rules) = (Vec::<&str>::new(), false);
     let (mut disallow_root, mut allows) = (false, false);
     for (key, value) in lines {
