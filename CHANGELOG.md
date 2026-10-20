@@ -5,6 +5,18 @@ report) is listed here under the release that makes it, with what to do. What ea
 of release may change is in the reference's
 [compatibility](docs/reference.md#compatibility) section.
 
+## Unreleased
+
+### Fixed
+
+- `titles.duplicate` counts indexable pages only. A page carrying a robots noindex meta
+  (a not-found page written three times, as Next.js does, or a pager marked `index:
+  false`) is not a search result and may share a title. A site that failed only on such
+  pages passes. Nothing to do.
+- A robots noindex inside a comment, a script, a style or a `<template>` is not the
+  page's: `sitemap.noindex_listed` fired on a listed page whose noindex was commented
+  out, and `titles.duplicate` would have skipped it. Crawlers index such a page.
+
 ## 0.1.0 — 2026-10-19
 
 The first public release. Since 0.1.0-rc.1:

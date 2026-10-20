@@ -666,7 +666,7 @@ check, plus a `routes` array naming all offenders.
 | `paths.reserved` | with `base_url` set, a route claims `/sitemap.xml` or `/sitemap-<n>.xml` — the framework emits those files from the route manifest and would overwrite the page (same `build: null` refusal) |
 | `links.internal` | an internal href resolves to no file in the build (with `base_url`, links written absolute to the site's own address are internal) |
 | `titles.missing` | a page has no non-empty `<title>` |
-| `titles.duplicate` | two pages share a title (`title`; `duplicate_of` names the first). With `locales:`, per locale: pages in different locales may share one; static files and `locales: none` pages are compared with every locale |
+| `titles.duplicate` | two indexable pages share a title (`title`; `duplicate_of` names the first). A page carrying a robots noindex meta is not a search result, so it may share one. With `locales:`, per locale: pages in different locales may share one; static files and `locales: none` pages are compared with every locale |
 | `titles.multiple` | a page has more than one `<title>` |
 | `sitemap.dangling` / `sitemap.missing_page` | sitemap and page set disagree (`loc` = the sitemap URL with no page, for `dangling`). An HTML page is excused from the sitemap when its route says `index: false` or the file carries a robots noindex meta |
 | `sitemap.noindex_listed` | the sitemap lists a page that carries a robots noindex meta (a hand-written meta on an indexable route) |
