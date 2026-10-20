@@ -1,9 +1,10 @@
 # `molde verify`: the check for any static site's output
 
-**Status: reviewed once (19 Oct 2026); it failed, and v2 is to be written before any code.**
-Review 1 is summarised at the end. It built every generator's default starter, ran a
-prototype of this design on them, and found false failures on all five. The sections
-below are v1 as reviewed.
+**Status: v2 (20 Oct 2026), for review 2 before any code.** v1 failed review 1: a prototype
+of it reported false failures on the default starter of every generator it was run on
+(the review is kept at the end, as the record). Each rule below that differs from v1 names
+the finding it answers (Finding 1–Finding 7). Building waits on the maintainer's decision after
+molde's first launch.
 
 ## 1. Why
 
@@ -36,153 +37,161 @@ generator, verify names the page but not the template or content file that made 
 
 ## 2. Goals and non-goals
 
-**Goals.**
-- `molde verify <dir>` checks a folder of built HTML (Hugo's `public/`, Astro's `dist/`,
-  a Next.js static export's `out/`, Eleventy's `_site/`, Zola's `public/`, anything) and
-  prints the same JSON report shape as `molde check`.
-- **No false failures on correct output of the common generators** in their default
-  configurations. A verifier that fails a correct Hugo site on day one is uninstalled.
-- **The same check ids and meaning** as `molde check` wherever a check runs in both, so
-  an agent or script that reads one reads the other.
-- **Fast:** the same parallel engine as `check` (1,901 pages in under half a second).
-- **Optional publish gate:** like `check`, publish only a passing build (§6).
+**The release gate (Finding 1, Finding 2).** verify ships only when it reports **zero errors** on the
+official default starter of Hugo, Astro, Next.js (static export, `trailingSlash` on and
+off), Eleventy and Zola, plus one realistic configuration of each (§9). A verifier that
+fails a correct site on day one is uninstalled.
 
-**Non-goals (v1).**
-- Provenance: which template or content file made a page. Foreign generators don't record it.
-- Locale checks (`hreflang.mismatch`, `html.lang`), size budgets, `jsonld.type_missing`
-  and `description.missing`. These depend on molde's site model; some could come later
-  through a small config file (§9).
-- Fetching other sites, rendering, running JavaScript.
-- Fixing anything.
+**Goals.**
+- `molde verify <dir>` checks a folder of built HTML and prints a report in `check`'s shape.
+- **The value is the cross-page consistency** no link checker covers, checked offline on the build folder: the sitemap, the canonicals, noindex, robots.txt and the pages agreeing with one another. A links-only verify would be a slower lychee.
+- **One root cause, one error:** when hundreds of errors share a cause (a wrong `--base-url`, clean URLs), report the cause.
+- **The same ids and meaning as `check`** wherever a check runs in both. Where verify needs a rule `check` doesn't have, it gets a new id rather than bending an old one (Finding 5).
+
+**Non-goals (v1 of verify).** Provenance (which template made a page); locales; size
+budgets; `jsonld.type_missing`; `description.missing`; the publish gate (Finding 7, §8); fetching
+anything; running JavaScript; fixing anything.
 
 ## 3. Command line
 
 ```
-molde verify <DIR> [--base-url URL] [--out O] [--og] [--format json]
+molde verify <DIR> [--base-url URL] [--clean-urls] [--ignore PATTERN]...
+                   [--spa-fallback PATH] [--require-canonical] [--og] [--sitemap-complete]
 ```
 
-- `<DIR>`: the built site, read only.
-- `--base-url`: the site's public address, as in `site.yaml`. It turns on the checks that
-  need one: the sitemap, canonical and `og:url`, robots.txt, and absolute links to the
-  site's own address. Without it they are skipped and the report says so (§5).
-  - **Not inferred** from the sitemap or a canonical tag: a wrong guess would make every
-    page fail, and a broken sitemap would hide itself.
-- `--out O`: the publish gate (§6). Without it, verify only reads.
-- `--og`: also require a full Open Graph block (`og.missing`) on every indexable page.
-  Off by default (§4).
-- **Exit codes** as `check`: 0 pass, 1 fail, 2 a wrong command line.
-
-## 4. What runs, and how a page is defined without routes
-
-**The page set is every `.html` file under `<DIR>`.**
-- **A page is indexable** unless it carries a robots noindex meta. That is the rule `check` already applies to static HTML.
-- **Path to URL:** `index.html` is `/x/`; any other `.html` file is its own path, as in molde's URL conventions.
-
-| Check | In verify | Notes |
+| Flag | Meaning | Answers |
 |---|---|---|
-| `links.internal` | always | as in `check`, with own-address links when `--base-url` is set |
-| `titles.missing` / `.duplicate` / `.multiple` | always | |
-| `html.double_escaped` | always | |
-| `jsonld.invalid` | always | |
-| `sitemap.*` | with `--base-url` and a `sitemap.xml` in `<DIR>` | the same mapping from `<loc>` to file; a page is excused from the sitemap by a noindex meta |
-| `canonical.missing` / `.mismatch` / `.not_in_sitemap` / `.duplicate` | with `--base-url` | `missing` and `not_in_sitemap` on indexable pages only |
-| `og.mismatch` / `og.duplicate` / `og.title_mismatch` | with `--base-url` | they compare what is there |
-| `og.missing` | with `--og` | molde requires OG on titled routes; with no routes, it's opt-in |
-| `description.duplicate` | always | two indexable pages with the same meta description |
-| `robots.sitemap_missing` / `.blocks_all` | with `--base-url` and a `robots.txt` | |
-| `robots.missing` | never | it needs a route's `index: false` |
+| `--base-url` | the site's public address, possibly with a path (`https://user.github.io/repo/`). Turns on the sitemap, canonical, robots.txt and own-address checks; never inferred | v1 §3 |
+| `--clean-urls` | the host serves `/a` from `a.html` (Netlify, Vercel, Cloudflare Pages, GitHub Pages). Used by links, the sitemap and canonicals alike. Off by default, because S3 and CloudFront don't do it | Finding 3 |
+| `--ignore` | a URL path glob that is not this build's to check (`/cdn-cgi/*`, `/api/*`, a rewrite). Repeatable | Finding 6 |
+| `--spa-fallback` | a file the host serves for every unknown path (`/index.html`, `/200.html`). With it, an internal link to a page that isn't a file is not an error | Finding 6 |
+| `--require-canonical` | an indexable page without a canonical is an error (`canonical.missing`). Off by default: most starters carry none | Finding 1 |
+| `--og` | require a full Open Graph block (`og.missing`) and an og:title that agrees with the title (`og.title_mismatch`) | Finding 1 |
+| `--sitemap-complete` | an indexable document missing from the sitemap is an error, not a warning | Finding 1 |
 
-**A missing sitemap** with `--base-url` is reported (`sitemap.missing`), because a site
-that wants checking against a base URL wants a sitemap. This is the one check verify has
-that `check` doesn't need, since molde always writes one. Review question: should it be
-a warning instead?
+Exit codes as `check`: 0 pass, 1 fail, 2 a wrong command line. Warnings never fail.
 
-## 5. The report
+**Refusals (Finding 6, Finding 7):**
+- **An empty folder,** or one with no HTML, fails with one error (`verify.no_pages`). It is the CI hole of a build that failed silently.
+- **A folder that looks like a project root** (it holds `package.json`, `hugo.toml`, `config.toml`, `astro.config.*`, `next.config.*` or `.eleventy.js`) is refused, and the error names the likely output folder (`public/`, `dist/`, `out/`, `_site/`).
 
-The same shape as `check`:
+## 4. The page classifier (Finding 1, Finding 6)
 
-```json
-{"verdict": "fail", "published": false,
- "build": {"pages": 1901, "assets": 312, "ms": 410, "dir": "public"},
- "skipped": ["sitemap", "canonical", "og", "robots"],
- "errors": [{"layer": "output", "check": "links.internal", "page": "posts/a/index.html",
-             "attribute": "href", "broken_href": "/posts/b/", "hint": "…"}]}
-```
+Built once, used by every check. Each `.html` / `.htm` file (any case) under `<DIR>` is
+exactly one of:
 
-- **No `route` or `template`** on errors. That is allowed: the compatibility section makes
-  them "when present".
-- **`skipped`** (new, also useful in `check` later) lists the check families that didn't
-  run and why they didn't (no `--base-url`, no `sitemap.xml`). An agent then knows what is
-  left to check itself (the benchmark found agents re-check by hand what they believe a
-  checker misses).
-- **Hints are written for any generator:** "a page links to a file the build doesn't
-  have" rather than "render {{ std_head }}". `check` keeps its molde hints.
+| Kind | How it is recognised | What it is held to |
+|---|---|---|
+| **not a document** | no `<html`, `<head` or doctype in its first 2 KB (a search-engine verification file, a fragment) | nothing; it isn't a page |
+| **not-found page** | `404.html`, `404/index.html`, `_not-found/index.html`, `200.html` | links only; never in the sitemap, uniqueness, or canonical checks |
+| **redirect** | a `<meta http-equiv="refresh">`, or (Hugo aliases, pagers) a canonical to another page of the site | its target resolves (`redirect.target_missing`); never in sitemap completeness or uniqueness |
+| **noindex document** | a robots noindex meta | links, titles present; excused from the sitemap and from uniqueness |
+| **indexable document** | everything else | every check |
 
-## 6. The publish gate (`--out O`)
+`check` keeps its own page model from routes, but adopts the noindex rule for uniqueness
+(B11, `fix(check): pages with noindex may share a title`) so that the two commands agree.
 
-With `--out`, a passing verify copies `<DIR>` into `O/builds/<id>/` and swaps the
-`O/current` link, as `check` does. A failing one copies nothing and leaves `current` as
-it was.
-- **Build ids and locking** are the same as `check`'s, so `molde diff` and `molde serve`
-  work on the result.
-- **Dedup** is by content hash, so re-verifying an unchanged build reuses its id.
-- **The copy:** on large sites (43k pages) copying costs seconds. Hard links where the
-  file system allows, else a copy. Review question: is copying worth it at all, or should
-  the gate only print the verdict and let the deploy step decide?
+## 5. Checks
 
-## 7. What verify must not get wrong on real generators
+| Check | verify | Notes |
+|---|---|---|
+| `links.internal` | always | with the URL model of §6 |
+| `titles.missing`, `titles.multiple` | documents | |
+| `titles.duplicate`, `description.duplicate` | indexable documents | **warnings** on list-like pages (a path ending `/page/N/`, or a taxonomy path), errors elsewhere |
+| `html.double_escaped`, `jsonld.invalid` | documents | |
+| `canonical.duplicate`, `og.duplicate` | documents | |
+| `canonical.off_host` (new) | with `--base-url` | a canonical to another host, or outside the base path |
+| `canonical.target_missing` (new) | with `--base-url` | a canonical to a page of this site that isn't in the build |
+| `canonical.target_noindex` (new) | with `--base-url` | a canonical to a page carrying noindex |
+| `canonical.missing` | with `--require-canonical` | |
+| `canonical.mismatch` | **not in verify** | a canonical to another page is legitimate there (pagers, aliases); `check` keeps it, since molde writes canonicals itself |
+| `sitemap.dangling`, `sitemap.noindex_listed` | with a sitemap (§7) | |
+| `sitemap.non_canonical_listed` (new) | with a sitemap | the sitemap lists a page whose canonical points elsewhere |
+| `sitemap.missing_page` | **warning**; error with `--sitemap-complete` | sitemaps legitimately leave pages out |
+| `sitemap.not_found` (new) | **warning**, with `--base-url` and no sitemap | not `sitemap.missing`, which would read like `sitemap.missing_page` |
+| `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a robots.txt | `sitemap_missing` accepts any Sitemap line naming a sitemap in the build |
+| `redirect.target_missing` (new) | always | a meta refresh, or an alias's canonical, that leads nowhere |
+| `og.*` | with `--og` | |
 
-Each of these has to be handled, and tested against real output (§8):
+The new ids are new because their meaning is new (Finding 5). Those that make sense in `check`
+too (`canonical.target_missing`, `redirect.target_missing`) arrive there in the same
+release.
 
-- **Hugo**:
-  - alias pages (a `<meta http-equiv="refresh">` page with `noindex` and a canonical pointing to the target) must pass: noindex excuses the page from the sitemap, and the canonical is not required on a noindex page;
-  - `/404.html`, taxonomies, RSS (`index.xml`, not HTML).
-- **Next.js static export**: the not-found page written three times (`404.html`, `404/index.html`, `_not-found/index.html`), `_next/` assets with hashes, `trailingSlash` on or off (`/a.html` or `/a/index.html`), `.txt` RSC payloads.
-- **Astro**: hashed assets under `_astro/`, `@astrojs/sitemap`'s `sitemap-index.xml` + `sitemap-0.xml` (with `robots.txt` pointing at `sitemap-index.xml`, not `sitemap.xml`).
-- **Eleventy, Zola**: plain output; Zola's `sitemap.xml` and `robots.txt`.
-- **Sites under a path** (GitHub Pages `https://user.github.io/repo/`): links written as
-  `/repo/x/` resolve against `<DIR>` only after removing the base path. `check` already
-  maps sitemap locs with a base path; links need the same mapping (§R5).
-- **A sitemap index** under any name: `robots.sitemap_missing` should accept any
-  `Sitemap:` line that names a sitemap present in the build, not only `sitemap.xml`.
-  `check` keeps its exact rule, since molde writes `sitemap.xml`.
+## 6. The URL model (Finding 3, Finding 4, Finding 6)
 
-## 8. How it is tested
+- **Base path, stripped and required (Finding 4).** With `--base-url https://host/repo/`, a link `/repo/x/` resolves to `x/` in the build. A root-relative link outside the base path (`/x/`) is an error, `links.outside_base`: it works on disk and 404s in production. This is the check no link checker has.
+- **Clean URLs (Finding 3).** With `--clean-urls`, `/a` also resolves to `a.html`, in links, sitemap `<loc>`s and canonicals alike.
+- **URLs compared normalized:** the scheme and host in any case, an empty path the same as `/`, relative canonicals resolved against the page. B12 (`fix(check): canonical and og:url are compared as URLs`) does the same in `check`.
+- **`<base href>`** is honoured, in verify only: Angular and Flutter builds rely on it, and molde never writes one.
+- **Meta-refresh targets** are checked (`redirect.target_missing`).
+- **One cause, grouped.** If more than half the internal-link errors would resolve under `--clean-urls`, or under a base path, the report says so once, with the flag to try, instead of listing them all.
 
-- **The benchmark's ports as a corpus.** docs/bench/agent-cost has the same site in Hugo,
-  Astro, Next.js, Zola and Eleventy (the idiomatic and parity ports), each built by its
-  real generator.
-  - **False positives:** each correct build must pass verify with `--base-url`.
-  - **True positives:** each T4/T4b planted-defect workspace must fail on exactly the
-    planted categories that verify can see (links, titles, canonical/og, sitemap,
-    escaping), and only those.
-- **Real sites:** proximosdividendos, whichindex and dividendpedia, built by molde: verify
-  on their output must report what `check` reports, apart from provenance.
-- **Unit tests** for the page and URL mapping, `skipped`, the gate, and each generator
-  quirk in §7 as a fixture.
+## 7. Finding the sitemap (Finding 1)
 
-## 9. Later
+The first that exists:
+1. the `Sitemap:` lines of `robots.txt` that name a file in the build;
+2. `sitemap.xml`;
+3. `sitemap-index.xml`;
+4. `sitemap_index.xml`.
 
-- A `molde.verify.yaml` for what can't be inferred: budgets, the expected locales, the
-  `@type`s pages must carry, extra paths to ignore.
-- The GitHub Action that runs verify and comments the report on the pull request.
-- An MCP tool `verify`.
-- `skipped` in `check`'s report too.
+A sitemap index is followed into its children. `<loc>`s are read namespaced or in
+CDATA, and `<lastmod>` accepts every W3C form the protocol allows. With no sitemap at
+all, nothing compares against one: `sitemap.not_found` is a warning, and no
+canonical-in-sitemap check runs.
+
+## 8. The report (Finding 5)
+
+`check`'s shape, plus:
+- **`"command": "verify"`.**
+- **`skipped`:** `[{"checks": "sitemap", "reason": "no sitemap in the build"}, …]`.
+- **`warnings`** (as `check` already has with locales): never fail the verdict.
+- **`pages`:** counts per kind (§4), so a reader sees what was classified as what.
+- **No `route` or `template`**, which the compatibility rules allow. Hints are written for any generator, not for `std_head`.
+
+**No publish gate in verify's first version (Finding 7):** foreign sites deploy through their
+own CI, where the exit code is the gate.
+
+## 9. How it is tested (Finding 2)
+
+- **Fixtures, committed as built output** (built once, not in CI):
+  - each generator's official starter, in its default configuration;
+  - one realistic configuration each: Hugo with a theme, taxonomies, pagination and aliases; Next.js with `trailingSlash: false`; Astro with `build.format: 'file'`; a GitHub Pages build under a base path.
+- **Acceptance:** zero errors on every fixture with the flags its host needs (none, `--clean-urls`, the base path). Each fixture's README says which, and why.
+- **True positives:** each fixture copied with one planted defect per check, failing on exactly that one.
+- **molde's own sites:** verify on their output reports what `check` reports, apart from provenance.
+- **The prototype numbers of review 1** are the baseline v2 must improve on: 43, 30, 14, 2 and 2 errors, down to zero.
+
+## 10. Effort and order
+
+About 8–11 working days, as review 1 estimated:
+- the refactor (page classifier, link rules, head checks without the site model) 1–2;
+- the command and report 1;
+- generator semantics 3–4;
+- fixtures and tests 2–3;
+- docs 1.
+
+**Order:**
+1. the fixtures first, so every later step is measured against them;
+2. then the classifier;
+3. then the checks one family at a time, each PR keeping the fixtures at zero.
+
+Then upkeep as generator defaults change: fixtures get rebuilt on each generator's major release.
+
+## 11. Later
+
+A `molde.verify.yaml` for what flags can't say (ignores, expected locales, required
+`@type`s); the GitHub Action that runs verify and comments the report on a pull request;
+an MCP tool `verify`; `skipped` in `check`'s report.
 
 ## Risks
 
-- **R1** False failures on correct output of a common generator (§7, §8): the main risk. Every quirk listed needs a fixture before release.
-- **R2** A wrong `--base-url` makes every page fail: the flag is never guessed (§3), and the report's first error should say so when no page's canonical shares its host.
-- **R3** Opinionated checks (canonical required, OG) fail sites that chose otherwise: OG is opt-in; canonical is required only with `--base-url`.
-- **R4** The report shape drifts from `check`'s: the same ids and fields; `route`/`template` absent rather than empty.
-- **R5** Base-path deployments: link resolution maps the base path (§7).
-- **R6** Huge outputs: the same parallel engine; the gate's copy uses hard links (§6).
-- **R7** Symlinks and files outside `<DIR>`: verify never follows a symlink out of `<DIR>` (the security model's rule for `--out`).
-- **R8** Case-insensitive file systems: as `check`, a link that differs only in case passes on macOS; documented.
-- **R9** Non-UTF-8 HTML: read lossily, as `check` does for static files.
-- **R10** Generators that write the sitemap under another name: §7, a sitemap named in robots.txt.
-- **R11** Scope creep into a crawler: no network, ever.
-- **R12** It splits molde's message: README order, generator first or verifier first, is a product decision for the maintainer.
+- **R1 False failures on correct output.** The release gate (§2) and the fixtures (§9) answer it; every generator quirk becomes a fixture before release.
+- **R2 A wrong `--base-url`** makes every page fail. The grouped cause (§6) says so in one error.
+- **R3 Opinionated checks.** Canonical, OG and sitemap completeness are opt-in; uniqueness on list pages is a warning.
+- **R4 The two commands drift apart.** The same ids where the meaning is the same, new ids where it isn't (§5); B11 and B12 align `check`.
+- **R5 Upkeep.** Generator defaults change (Next.js 16 added `__next.*.txt` files). Fixtures are rebuilt on each major release, and verify's README lists the versions tested.
+- **R6 Scope creep.** No network, no rendering, no fixing, ever.
+- **R7 The message.** verify launches separately, after molde, on the maintainer's decision.
 
 ## Review 1 (19 Oct 2026): what v2 must change
 
