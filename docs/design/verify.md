@@ -1,10 +1,13 @@
 # `molde verify`: the check for any static site's output
 
-**Status: v2 (20 Oct 2026), for review 2 before any code.** v1 failed review 1: a prototype
+**Status: v2 (20 Oct 2026), built as `molde verify`.** v1 failed review 1: a prototype
 of it reported false failures on the default starter of every generator it was run on
 (the review is kept at the end, as the record). Each rule below that differs from v1 names
-the finding it answers (Finding 1–Finding 7). Building waits on the maintainer's decision after
-molde's first launch.
+the finding it answers (Finding 1–Finding 7). The implementation was then tested on two
+rounds of held-out generators (14 in all), an adversarial review, and nine real
+open-source sites; what they found refined the rules further. The reference's
+[Verify any site](../reference.md#verify-any-site) describes verify as built, and is the
+authority where the two differ.
 
 ## 1. Why
 
@@ -100,7 +103,7 @@ exactly one of:
 |---|---|---|
 | `links.internal` | always | with the URL model of §6 |
 | `titles.missing`, `titles.multiple` | documents | |
-| `titles.duplicate`, `description.duplicate` | indexable documents | **warnings** on list-like pages (a path ending `/page/N/`, or a taxonomy path), errors elsewhere |
+| `titles.duplicate`, `description.duplicate` | indexable documents | **warnings by default**; errors with `--unique`, except where a list-like page (a path ending `/page/N/`, or a taxonomy path) is involved. Changed while building: the official starters themselves share titles between home, section and about pages. That is SEO hygiene, not something broken, and often the theme's choice, so verify's default contract stays "nothing on this site is broken" |
 | `html.double_escaped`, `jsonld.invalid` | documents | |
 | `canonical.duplicate`, `og.duplicate` | documents | |
 | `canonical.off_host` (new) | with `--base-url` | a canonical to another host, or outside the base path |
