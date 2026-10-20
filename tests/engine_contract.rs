@@ -310,6 +310,31 @@ fn filters_not_python_methods() {
     // no pycompat: str/dict methods are unknown
     assert!(render_err(&env, "a.txt", "{{ s.upper() }}", ctx()).contains("unknown method"));
     assert!(render_err(&env, "a.txt", "{{ {'a': 1}.items() }}", ctx()).contains("unknown method"));
+    // the Python string methods agents reach for, and what to write instead
+    let csv = || context! { s => "a,b" };
+    for method in [
+        "{{ s.split(',') }}",
+        "{{ s.startswith('a') }}",
+        "{{ s.endswith('b') }}",
+    ] {
+        assert!(
+            render_err(&env, "a.txt", method, csv()).contains("unknown method"),
+            "{method}"
+        );
+    }
+    assert_eq!(
+        render(&env, "a.txt", "{{ s | split(',') | join('|') }}", csv()),
+        "a|b"
+    );
+    assert_eq!(
+        render(
+            &env,
+            "a.txt",
+            "{{ s is startingwith('a') }} {{ s is endingwith('b') }} {{ ',' in s }}",
+            csv()
+        ),
+        "True True True"
+    );
     // `urlencode` needs a minijinja feature molde doesn't enable
     let err = env
         .template_from_named_str("a.txt", "{{ s | urlencode }}")
@@ -324,4 +349,42 @@ fn filters_not_python_methods() {
             .expect_err("loop controls must be unknown");
         assert!(format!("{err:#}").contains("unknown statement"), "{err:#}");
     }
+}
+
+/// A `namespace` changed in a loop body is not seen by that loop's `for ... if` filter:
+/// the filter runs over the whole list first. Test inside the body instead.
+#[test]
+fn a_loop_filter_does_not_see_the_body_s_namespace() {
+    let env = env("ns-filter");
+    let ctx = || context! { items => vec![1, 2, 3] };
+    let filtered = "{% set ns = namespace(n=0) %}{% for i in items if ns.n < 1 %}{{ i }}{% set ns.n = ns.n + 1 %}{% endfor %}";
+    assert_eq!(render(&env, "a.txt", filtered, ctx()), "123");
+    let inner = "{% set ns = namespace(n=0) %}{% for i in items %}{% if ns.n < 1 %}{{ i }}{% set ns.n = ns.n + 1 %}{% endif %}{% endfor %}";
+    assert_eq!(render(&env, "a.txt", inner, ctx()), "1");
+}
+
+/// Data into an inline <script>: `tojson` gives a JS value that can't close the script;
+/// a quoted `"{{ x }}"` gets HTML escaping, which JavaScript doesn't undo.
+#[test]
+fn tojson_is_how_data_enters_an_inline_script() {
+    let env = env("script");
+    let ctx = || context! { x => "</script><b>" };
+    assert_eq!(
+        render(
+            &env,
+            "a.html",
+            "<script>var x = {{ x | tojson }};</script>",
+            ctx()
+        ),
+        r#"<script>var x = "\u003c/script\u003e\u003cb\u003e";</script>"#
+    );
+    assert_eq!(
+        render(
+            &env,
+            "a.html",
+            "<script>var x = \"{{ x }}\";</script>",
+            ctx()
+        ),
+        "<script>var x = \"&lt;/script&gt;&lt;b&gt;\";</script>"
+    );
 }
