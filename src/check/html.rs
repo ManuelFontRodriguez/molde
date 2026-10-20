@@ -82,27 +82,53 @@ pub(crate) fn percent_decode(s: &str) -> String {
 /// Does the page carry `<meta name="robots" content="…noindex…">` (or `none`)?
 /// Attribute-order-independent and case-insensitive, like the head checks; values may be
 /// double-quoted, single-quoted or unquoted (`<meta name=robots content=noindex>`).
+/// A tag inside a comment, a script, a style or a `<template>` is not the page's: a
+/// commented-out noindex leaves the page indexable, as crawlers read it.
 pub(crate) fn has_noindex(html: &str) -> bool {
+    // the spans are found only for a page that has a noindex tag at all, which most don't
+    let mut hidden: Option<Vec<(usize, usize)>> = None;
+    let mut in_hidden = |at: usize| {
+        let spans = hidden.get_or_insert_with(|| {
+            static TEMPLATE: OnceLock<regex::Regex> = OnceLock::new();
+            let template = TEMPLATE
+                .get_or_init(|| regex::Regex::new(r"(?is)<template\b.*?</template\s*>").unwrap());
+            let mut v: Vec<(usize, usize)> = code_re()
+                .find_iter(html)
+                .chain(template.find_iter(html))
+                .map(|m| (m.start(), m.end()))
+                .collect();
+            v.sort_unstable();
+            v
+        });
+        spans.iter().any(|&(a, b)| a <= at && at < b)
+    };
     meta_tag_re().find_iter(html).any(|m| {
-        let mut is_robots = false;
-        let mut noindex = false;
-        for cap in attr_re().captures_iter(m.as_str()) {
-            let value = attr_value(&cap);
-            // an unquoted value of a self-closed tag keeps the slash: `content=noindex/>`
-            let value = value.trim_end_matches('/');
-            match cap[1].to_ascii_lowercase().as_str() {
-                "name" => is_robots = value.eq_ignore_ascii_case("robots"),
-                "content" => {
-                    noindex = value.split(',').any(|d| {
-                        let d = d.trim();
-                        d.eq_ignore_ascii_case("noindex") || d.eq_ignore_ascii_case("none")
-                    })
-                }
-                _ => {}
-            }
+        if !robots_noindex(m.as_str()) {
+            return false;
         }
-        is_robots && noindex
+        !in_hidden(m.start())
     })
+}
+
+fn robots_noindex(tag: &str) -> bool {
+    let mut is_robots = false;
+    let mut noindex = false;
+    for cap in attr_re().captures_iter(tag) {
+        let value = attr_value(&cap);
+        // an unquoted value of a self-closed tag keeps the slash: `content=noindex/>`
+        let value = value.trim_end_matches('/');
+        match cap[1].to_ascii_lowercase().as_str() {
+            "name" => is_robots = value.eq_ignore_ascii_case("robots"),
+            "content" => {
+                noindex = value.split(',').any(|d| {
+                    let d = d.trim();
+                    d.eq_ignore_ascii_case("noindex") || d.eq_ignore_ascii_case("none")
+                })
+            }
+            _ => {}
+        }
+    }
+    is_robots && noindex
 }
 
 /// Attribute-context escape: quotes are covered, so a value cannot break out of

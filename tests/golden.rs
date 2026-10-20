@@ -207,6 +207,41 @@ fn duplicate_and_missing_titles_are_caught() {
 }
 
 #[test]
+fn noindex_pages_may_share_a_title() {
+    // a not-found page written three times (as Next.js does), each with noindex, plus an
+    // indexable page with the same title: none of them is a duplicate in search
+    let dir = std::env::temp_dir().join(format!("molde-titles-noindex-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("templates")).unwrap();
+    fs::write(
+        dir.join("routes.yaml"),
+        "routes:\n  - path: /404.html\n    template: nf.html.j2\n  - path: /404/index.html\n    template: nf.html.j2\n  - path: /_not-found/index.html\n    template: nf.html.j2\n  - path: /a/index.html\n    template: a.html.j2\n  - path: /b/index.html\n    template: a.html.j2\n",
+    )
+    .unwrap();
+    fs::write(dir.join("data.json"), "{}").unwrap();
+    fs::write(
+        dir.join("templates/nf.html.j2"),
+        "<html><head><title>Not found</title><meta name=\"robots\" content=\"noindex\"></head><body>x</body></html>",
+    )
+    .unwrap();
+    fs::write(
+        dir.join("templates/a.html.j2"),
+        // a commented-out noindex is not one: crawlers index the page
+        "<html><head><title>Not found</title><!-- <meta name=\"robots\" content=\"noindex\"> -->\
+         <script>var t = '<meta name=\"robots\" content=\"noindex\">';</script></head><body>x</body></html>",
+    )
+    .unwrap();
+    let report = molde::build(&dir, &dir.join("out")).expect("build failed");
+    let errors = molde::testing::check_titles(&report.build_dir).expect("check failed");
+    // the two indexable pages still share a title: that one is reported, once
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert_eq!(errors[0]["check"], "titles.duplicate");
+    assert_eq!(errors[0]["page"], "b/index.html");
+    assert_eq!(errors[0]["duplicate_of"], "a/index.html");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn sitemap_disagreement_is_caught() {
     // negative test: tamper with a passing build — delete a listed page (dangling loc)
     // and drop in an unlisted one (missing_page)

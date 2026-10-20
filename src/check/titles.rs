@@ -1,5 +1,5 @@
 use crate::build::par_map;
-use crate::check::html::html_files;
+use crate::check::html::{has_noindex, html_files};
 use crate::check::read_page;
 use crate::site::Page;
 use anyhow::Result;
@@ -7,7 +7,9 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-/// Conformance check 2: every page has a non-empty <title>, unique across the build.
+/// Conformance check 2: every page has a non-empty <title>, and indexable pages have one no
+/// other indexable page has. A page carrying a robots noindex meta isn't a search result,
+/// so it may share a title (Next.js writes its not-found page three times).
 pub fn check_titles(build_dir: &Path) -> Result<Vec<serde_json::Value>> {
     check_titles_scoped(build_dir, &[])
 }
@@ -83,12 +85,12 @@ pub(crate) fn check_titles_scoped(
             .captures(&html)
             .map(|cap| cap[1].trim().to_string())
             .unwrap_or_default();
-        Ok((count, title))
+        Ok((count, title, has_noindex(&raw)))
     })?;
     // then across pages, in page order, so `duplicate_of` names the same page
     let mut errors = Vec::new();
     let mut first_page_with = ScopedFirst::default();
-    for (page, (count, title)) in files.iter().zip(found) {
+    for (page, (count, title, noindex)) in files.iter().zip(found) {
         let page_str = page.display().to_string();
         if count > 1 {
             errors.push(serde_json::json!({
@@ -104,6 +106,9 @@ pub(crate) fn check_titles_scoped(
                 "check": "titles.missing",
                 "page": page_str,
             }));
+        } else if noindex {
+            // neither reported nor remembered: an indexable page that shares a noindex
+            // page's title is not a duplicate in search either
         } else if let Some(other) =
             first_page_with.first(&title, scope_of.get(page).copied(), &page_str)
         {
