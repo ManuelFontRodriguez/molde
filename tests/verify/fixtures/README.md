@@ -3,7 +3,8 @@
 The built output of each generator's official starter, plus realistic configurations, as
 docs/design/verify.md §9 asks. **Built once, on 20 Oct 2026, and committed as files**: CI
 never builds them. They're the release gate: verify must report, on each, exactly the
-errors listed here, no more and none missing. Every listed error is a genuine defect of
+errors listed here, no more and none missing (`tests/verify.rs`
+`every_fixture_reports_exactly_its_recorded_errors` holds the same list). Every listed error is a genuine defect of
 the starter, with its reason.
 
 The node-based fixtures were built in the official Node container
@@ -13,14 +14,14 @@ were the locally installed builds (the same versions as the agent-cost benchmark
 
 | Fixture | Generator | Source | Pages | verify flags | Known genuine errors |
 |---|---|---|---|---|---|
-| `hugo-quickstart` | Hugo 0.168.0 | Hugo's quickstart (`hugo new site`, Ananke theme `18867db318d8`, 2026-09-27, one post) | 7 | `--base-url https://example.org/` | to be recorded |
-| `hugo-realistic` | Hugo 0.168.0 | the quickstart plus 12 posts with tags, `pagerSize = 4` and one alias (`/old/post-3/`) | 29 | `--base-url https://example.org/` | to be recorded |
-| `hugo-realistic-basepath` | Hugo 0.168.0 | `hugo-realistic` built with `-b https://user.github.io/repo/` | 29 | `--base-url https://user.github.io/repo/` | `links.outside_base` on each post: the content links `/posts/my-first-post/` root-relative, which 404s under the base path |
-| `eleventy-base-blog` | Eleventy 3.1.7 | github.com/11ty/eleventy-base-blog `cf0cc1f1b597` (2026-10-15) | 13 | `--base-url https://example.com/` | to be recorded |
-| `astro-blog` | Astro 7.4.1 | `npm create astro@latest -- --template blog` | 8 | `--base-url https://example.com/` | to be recorded (`sitemap-index.xml` naming) |
-| `nextjs-export` | Next.js 16.4.2 | `create-next-app@latest` defaults, `output: "export"`, `trailingSlash: false` | 3 | `--base-url https://example.com/ --clean-urls` | to be recorded |
-| `nextjs-export-trailing-slash` | Next.js 16.4.2 | the same, `trailingSlash: true` | 4 | `--base-url https://example.com/` | to be recorded |
-| `zola-getting-started` | Zola 0.23.6 | the "getting started" blog of Zola's docs (base, index, blog and blog-page templates; two posts), `build_search_index = true` | 5 | `--base-url https://example.com/` | `titles.duplicate`: every page's `<title>` is the tutorial's hard-coded "MyBlog" |
+| `hugo-quickstart` | Hugo 0.168.0 | Hugo's quickstart (`hugo new site`, Ananke theme `18867db318d8`, 2026-09-27, one post) | 7 | `--base-url https://example.org/` | none |
+| `hugo-realistic` | Hugo 0.168.0 | the quickstart plus 12 posts with tags, `pagerSize = 4` and one alias (`/old/post-3/`) | 29 | `--base-url https://example.org/` | none |
+| `hugo-realistic-basepath` | Hugo 0.168.0 | `hugo-realistic` built with `-b https://user.github.io/repo/` | 29 | `--base-url https://user.github.io/repo/` | `links.outside_base`, one error for 21 pages: the content links `/posts/my-first-post/` root-relative, which 404s under the base path |
+| `eleventy-base-blog` | Eleventy 3.1.7 | github.com/11ty/eleventy-base-blog `cf0cc1f1b597` (2026-10-15) | 13 | `--base-url https://example.com/` | none |
+| `astro-blog` | Astro 7.4.1 | `npm create astro@latest -- --template blog` | 8 | `--base-url https://example.com/` | none (its `sitemap-index.xml` is found by name) |
+| `nextjs-export` | Next.js 16.4.2 | `create-next-app@latest` defaults, `output: "export"`, `trailingSlash: false` | 3 | `--base-url https://example.com/ --clean-urls` | none |
+| `nextjs-export-trailing-slash` | Next.js 16.4.2 | the same, `trailingSlash: true` | 4 | `--base-url https://example.com/` | none |
+| `zola-getting-started` | Zola 0.23.6 | the "getting started" blog of Zola's docs (base, index, blog and blog-page templates; two posts), `build_search_index = true` | 5 | `--base-url https://example.com/` | none; every page's `<title>` is the tutorial's hard-coded "MyBlog", a `titles.duplicate` warning (an error with `--unique`) |
 
 **Next.js:** create-next-app 16.4 enables `cacheComponents` and `partialPrefetching`. Both
 imply partial prerendering, which static export rejects ("PPR cannot be enabled in export

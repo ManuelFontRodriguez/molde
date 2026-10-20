@@ -460,4 +460,188 @@ fn one_cause_one_error() {
         .find_map(|s| s["suggestion"].as_str())
         .unwrap();
     assert!(s.contains("--base-url https://user.github.io/repo/"), "{s}");
+    // ...and its 32 broken links are that one cause, not 32 errors
+    assert_eq!(
+        errors(&r),
+        map(&[("verify.base_url_mismatch", 1)]),
+        "{:#}",
+        r["errors"]
+    );
+    assert_eq!(r["errors"][0]["given"], Value::Null);
+    assert_eq!(r["errors"][0]["found"], "https://user.github.io/repo/");
+}
+
+/// A planted defect run with its own options.
+type Case = (&'static str, Box<dyn Fn(&Path)>, molde::VerifyOptions, Want);
+
+/// What the held-out review (VitePress, Docusaurus, SvelteKit, Gatsby, stress sites)
+/// found verify getting wrong, each planted in a copy of a real build.
+#[test]
+fn held_out_review_cases() {
+    let o = || opts(BASE);
+    let none = molde::VerifyOptions::default;
+    let cases: Vec<Case> = vec![
+        // a locale's own 404 page (Docusaurus, Hugo i18n) is a not-found page
+        (
+            "nested-404",
+            Box::new(|d| {
+                fs::create_dir_all(d.join("fr")).unwrap();
+                fs::write(d.join("fr/404.html"), "<!doctype html><html><head><title>Introuvable</title>\
+                    <link rel=\"canonical\" href=\"https://example.org/fr/404.html/\">\
+                    <link rel=\"alternate\" hreflang=\"en\" href=\"https://example.org/404.html/\"></head></html>").unwrap();
+            }),
+            o(),
+            &[],
+        ),
+        // an image sitemap's <image:loc> names an image, not a page
+        (
+            "image-loc",
+            Box::new(|d| {
+                edit(d, "sitemap.xml", "</url>",
+                "<image:image><image:loc>https://cdn.example/x.png</image:loc></image:image></url>")
+            }),
+            o(),
+            &[],
+        ),
+        // a robots.txt without Sitemap lines is valid when the build has no sitemap...
+        (
+            "robots-no-sitemap",
+            Box::new(|d| {
+                fs::remove_file(d.join("sitemap.xml")).unwrap();
+                fs::write(d.join("robots.txt"), "User-agent: *\nDisallow:\n").unwrap();
+            }),
+            o(),
+            &[],
+        ),
+        // ...but a sitemap it doesn't name, or a named one that isn't there, is an error
+        (
+            "robots-unnamed-sitemap",
+            Box::new(|d| fs::write(d.join("robots.txt"), "User-agent: *\nDisallow:\n").unwrap()),
+            o(),
+            &[("robots.sitemap_missing", 1)],
+        ),
+        (
+            "robots-named-elsewhere",
+            Box::new(|d| {
+                fs::remove_file(d.join("sitemap.xml")).unwrap();
+                fs::write(
+                    d.join("robots.txt"),
+                    "Sitemap: https://example.org/gone.xml\n",
+                )
+                .unwrap();
+            }),
+            o(),
+            &[("robots.sitemap_missing", 1)],
+        ),
+        // a meta refresh is checked without --base-url, however its content is spelled
+        (
+            "refresh-no-base",
+            Box::new(|d| {
+                for (i, content) in [
+                    "0;Url=/posts/",
+                    "0; url = /posts/",
+                    "0,url=/posts/",
+                    "0;URL='/nope/'",
+                ]
+                .iter()
+                .enumerate()
+                {
+                    fs::write(d.join(format!("r{i}.html")), format!(
+                        "<!doctype html><html><head><title>r</title><meta http-equiv=\"refresh\" content=\"{content}\"></head></html>")).unwrap();
+                }
+            }),
+            none(),
+            &[("redirect.target_missing", 1)],
+        ),
+        // the code sample on a docs page is text, not a link
+        (
+            "code-sample",
+            Box::new(|d| {
+                edit(d, POST, "</body>",
+                "<pre><code>&lt;link rel=&quot;icon&quot; href=&quot;/favicon.ico&quot;&gt;</code></pre></body>")
+            }),
+            o(),
+            &[],
+        ),
+        // a non-ASCII relative link used to panic
+        (
+            "non-ascii",
+            Box::new(|d| edit(d, POST, "</body>", "<a href=\"カテゴリ/\">x</a></body>")),
+            o(),
+            &[("links.internal", 1)],
+        ),
+    ];
+    for (tag, plant, opts, want) in cases {
+        assert_eq!(planted(tag, plant, opts), map(want), "{tag}");
+    }
+}
+
+/// A shared value (a theme's default description) is one warning, not one per page.
+#[test]
+fn a_value_many_pages_share_is_one_warning() {
+    let dir = copy("hugo-realistic", "shared-desc");
+    let description = regex::Regex::new(r#"<meta name="description" content="[^"]*""#).unwrap();
+    for f in walk(&dir) {
+        if f.ends_with("index.html") && f.contains("posts/post-") {
+            let s = fs::read_to_string(dir.join(&f)).unwrap();
+            let s = description.replace(&s, r#"<meta name="description" content="The default""#);
+            fs::write(dir.join(&f), s.as_ref()).unwrap();
+        }
+    }
+    let r = molde::run_verify(&dir, &opts(BASE)).unwrap();
+    let shared: Vec<&Value> = r["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|w| w["description"] == "The default")
+        .collect();
+    assert_eq!(shared.len(), 1, "{:#}", r["warnings"]);
+    assert!(shared[0]["count"].as_u64().unwrap() > 10, "{:#}", shared[0]);
+    assert_eq!(shared[0]["examples"].as_array().unwrap().len(), 5);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+fn walk(dir: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    for e in walkdir::WalkDir::new(dir) {
+        let e = e.unwrap();
+        if e.file_type().is_file() {
+            out.push(
+                e.path()
+                    .strip_prefix(dir)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+        }
+    }
+    out
+}
+
+/// A refusal stops before reading the build, as check's stops do: `build` is null, and
+/// the project root names the folder its generator writes.
+#[test]
+fn refusals_say_where_to_look() {
+    let root = std::env::temp_dir().join(format!("molde-verify-refuse-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let r = molde::run_verify(&root, &opts(BASE)).unwrap();
+    assert_eq!(r["build"], Value::Null);
+    assert!(r["errors"][0]["hint"].is_string());
+    for (marker, out) in [
+        ("mkdocs.yml", "site/"),
+        ("_config.yml", "_site/"),
+        ("docusaurus.config.ts", "build/"),
+        ("next.config.mjs", "out/"),
+        (".eleventy.js", "_site/"),
+    ] {
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join(marker), "").unwrap();
+        let r = molde::run_verify(&root, &opts(BASE)).unwrap();
+        assert_eq!(errors(&r), map(&[("verify.project_root", 1)]), "{marker}");
+        assert_eq!(r["build"], Value::Null);
+        let message = r["errors"][0]["message"].as_str().unwrap();
+        assert!(message.contains(out), "{marker}: {message}");
+    }
+    let _ = fs::remove_dir_all(&root);
 }

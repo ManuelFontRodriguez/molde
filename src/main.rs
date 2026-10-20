@@ -98,7 +98,7 @@ enum Cmd {
         dir: PathBuf,
         /// The site's public address, with its base path if it has one
         /// (https://user.github.io/repo/). Turns on the canonical, sitemap and robots checks.
-        #[arg(long)]
+        #[arg(long, value_parser = molde::parse_base_url)]
         base_url: Option<String>,
         /// The host serves /a from a.html (Netlify, Vercel, Cloudflare Pages, GitHub Pages).
         #[arg(long)]
@@ -233,6 +233,15 @@ fn main() -> Result<()> {
             sitemap_complete,
             unique,
         } => {
+            if let Some(msg) = spa_fallback
+                .as_deref()
+                .and_then(|f| molde::spa_fallback_error(&dir, f))
+            {
+                use clap::CommandFactory;
+                Cli::command()
+                    .error(clap::error::ErrorKind::ValueValidation, msg)
+                    .exit();
+            }
             let opts = molde::VerifyOptions {
                 base_url,
                 clean_urls,

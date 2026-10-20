@@ -776,10 +776,10 @@ molde verify out --base-url https://user.github.io/repo/ --clean-urls
 
 | Flag | Meaning |
 |---|---|
-| `--base-url URL` | the site's public address, with its base path if it has one. Turns on the canonical, sitemap, robots.txt and own-address checks; without it they are skipped, and the report suggests the address the pages' canonicals use |
+| `--base-url URL` | the site's public address, with its base path if it has one: `http(s)://`, a host and an optional path, no query or fragment (anything else exits 2). Turns on the canonical, sitemap, robots.txt and own-address checks; without it they are skipped, and the report suggests the address the pages' canonicals use |
 | `--clean-urls` | the host serves `/a` from `a.html` (Netlify, Vercel, Cloudflare Pages, GitHub Pages; not S3 or CloudFront) |
 | `--ignore GLOB` | a site path that isn't this build's to check (`/cdn-cgi/**`, `/api/**`), with the glob rules of size budgets. Repeatable |
-| `--spa-fallback PATH` | the host serves this file for every unknown page (a single-page app): a link to a page that isn't a file is fine; a missing asset still isn't |
+| `--spa-fallback PATH` | the host serves this file for every unknown page (a single-page app): a link to a page that isn't a file is fine; a missing asset still isn't. The file must be in the build (else exit 2) |
 | `--require-canonical` | an indexable page without a canonical is an error (`canonical.missing`) |
 | `--og` | require the Open Graph block (`og.missing`) and an og:title that agrees with the title (`og.title_mismatch`) |
 | `--sitemap-complete` | an indexable page missing from the sitemap is an error, not a warning |
@@ -790,9 +790,9 @@ and each check judges it by that:
 
 | Kind | Recognised by | Held to |
 |---|---|---|
-| `not_document` | no `<html`, `<head` or doctype in its first 2 KB (a verification file, a fragment) | nothing |
-| `not_found` | `404.html`, `404/index.html`, `_not-found.html`, `_not-found/index.html`, `200.html` | its links only |
-| `redirect` | a meta refresh, or a canonical to another page of the build (an alias, a pager) | its links and its target |
+| `not_document` | no `<html`, `<head` or doctype in its first 2 KB, after a byte-order mark and leading comments (a verification file, a fragment) | nothing |
+| `not_found` | `404.html`, `404/index.html`, `_not-found.html`, `_not-found/index.html` at any depth (a locale's own `fr/404.html`), and the root `200.html` | its links only, `rel=alternate` links aside (no one reads a 404's head) |
+| `redirect` | a meta refresh with a URL (read as the HTML spec reads `content`: `0;url=…`, `0, URL = '…'`, `0;…`), or a canonical to another page of the build (an alias, a pager; an absolute canonical counts only with `--base-url`) | its links and its target |
 | `noindex` | a robots noindex meta | links and titles; kept out of the sitemap and of uniqueness |
 | `indexable` | everything else | every check |
 
@@ -803,31 +803,32 @@ The report's `pages` counts each kind.
 
 | check | when | fires when |
 |---|---|---|
-| `links.internal` | always | a link or asset (`href`, `src`, `srcset`, CSS `url()` and `@import`) names no file of the build. The same missing page linked from three or more pages is one error, with `target`, `count` and `pages` |
+| `links.internal` | always | a link or asset (`href`, `src`, `srcset`, CSS `url()` and `@import`, read inside tags as `check` reads them; `<base>` and canonical hrefs are not links) names no file of the build. The same missing page linked from three or more pages is one error, with `target`, `count` and `pages` |
 | `links.outside_base` | with a base path | a link leaves the base path (`/posts/x/` on a site at `/repo/`): it works on disk and 404s in production |
-| `links.clean_urls` | without `--clean-urls` | most broken links would resolve as `a.html`: one error saying to try `--clean-urls` |
+| `links.clean_urls` | without `--clean-urls` | most missing pages (links, canonicals, redirects and sitemap entries) would resolve as `a.html`: one error for all of them (`count`, `by_check`, `examples`) saying to try `--clean-urls` |
 | `titles.missing`, `titles.multiple` | documents | as in `check` |
-| `titles.duplicate`, `description.duplicate` | indexable documents | warnings; errors with `--unique` |
+| `titles.duplicate`, `description.duplicate` | indexable documents | warnings; errors with `--unique`. A value more than 10 pages share with the same first holder (a theme's default description) is one entry, with `count` and five `examples` |
 | `html.double_escaped`, `jsonld.invalid` | documents | as in `check` |
 | `canonical.duplicate`, `og.duplicate` | documents | as in `check` |
 | `canonical.off_host` | with `--base-url` | the canonical is on another host, or outside the base path |
 | `canonical.target_missing` | with `--base-url` | the canonical names a page this build doesn't have |
-| `canonical.target_noindex` | with `--base-url` | the canonical names a page that asks not to be indexed |
+| `canonical.target_noindex` | with `--base-url`, and on redirects always | the canonical names a page that asks not to be indexed |
 | `canonical.missing` | with `--require-canonical` | an indexable page has none |
-| `redirect.target_missing` | with `--base-url` | a meta refresh or an alias leads to a page this build doesn't have |
+| `redirect.target_missing` | always (an absolute target with `--base-url`) | a meta refresh or an alias leads to a page this build doesn't have |
 | `sitemap.dangling`, `sitemap.noindex_listed` | with a sitemap | as in `check` |
 | `sitemap.non_canonical_listed` | with a sitemap | the sitemap lists a redirect: list the page it points to |
 | `sitemap.missing_page` | with a sitemap | a warning; an error with `--sitemap-complete` |
 | `sitemap.not_found` | with `--base-url` | a warning: no sitemap found |
-| `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a `robots.txt` | robots.txt names no sitemap in the build / shuts every crawler out of a site with pages to index |
+| `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a `robots.txt` | robots.txt names a sitemap the build doesn't have, or the build has a sitemap robots.txt doesn't name (no Sitemap line and no sitemap is valid: that is `sitemap.not_found`'s warning) / shuts every crawler out of a site with pages to index |
 | `og.missing`, `og.title_mismatch` | with `--og` | |
-| `verify.base_url_mismatch` | with `--base-url` | the pages claim another address (their canonicals' host and base path), and it explains most of the errors: one error naming it (`found`), plus the errors that remain under both addresses |
+| `verify.base_url_mismatch` | with `--base-url`, or without it when the pages claim a base path | the pages claim another address (their canonicals' host and base path), and it explains most of the errors: one error naming it (`found`; `given` is null without `--base-url`), plus the errors and warnings that remain under both addresses |
 | `verify.no_pages` | always | the folder has no HTML documents (an empty build) |
 | `verify.project_root` | always | the folder is a project (it holds `package.json`, `hugo.toml`, …), not its output: the message names the output folder |
 
 **The sitemap** is the first that exists: one robots.txt names, `sitemap.xml`,
 `sitemap-index.xml` or `sitemap_index.xml`. A sitemap index is followed into its children,
-and `<loc>`s are read namespaced or in CDATA.
+and `<loc>`s are read namespaced or in CDATA; an extension's (`<image:loc>`, `<video:…>`,
+`<news:…>`, `<xhtml:…>`) names no page and is skipped.
 
 **The report** has `check`'s fields (`verdict`, `published`, always `false`, `build`,
 `errors`), plus:
@@ -835,6 +836,21 @@ and `<loc>`s are read namespaced or in CDATA.
 - `pages`, the counts by kind;
 - `warnings`;
 - `skipped`, each family that didn't run and why (`[{"checks", "reason", "suggestion"?}]`).
+
+**URLs** resolve as a static host serves them: `/a/` and `/a` from `a/index.html`
+(S3 website endpoints, GitHub Pages, Netlify; a CloudFront distribution in front of an
+S3 REST origin returns 403 for `/a`, and serves `/a/` only with a rewrite), `/a` from
+`a.html` only with `--clean-urls`, file names exactly (`%2F` is part of a name, not a
+`/`). `<base href>` moves relative links: to a folder of this site, or out of verify's
+reach (another host, or an absolute base without `--base-url`), where they are not
+judged; the first `<base>` with an `href` counts, as in browsers.
+
+**Where verify's report differs from check's**, for a script that reads both: `build` is
+`{dir, files, ms}` (pages are counted by kind in `pages`), or `null` when verify refused
+the folder (`verify.project_root`, a missing folder); `links.internal` groups a target
+three or more pages link to into one error; duplicates are warnings unless `--unique`;
+and `robots.sitemap_missing` asks for any sitemap of the build, not
+`<base_url>/sitemap.xml`.
 
 Errors carry `page` but no `route` or `template`: verify can't know which source made a
 page, and only molde's own `check` can. That is the difference between the two: run

@@ -83,56 +83,58 @@ pub(crate) struct LinkCtx<'a> {
 
 impl LinkCtx<'_> {
     /// The broken ones among a file's references, each written link once.
-    fn judge(
-        &self,
-        rel: &str,
-        base_href: Option<&str>,
-        canonicals: &[String],
-        refs: Vec<Ref>,
-    ) -> Vec<Broken> {
+    fn judge(&self, rel: &str, base_href: Option<&str>, refs: Vec<Ref>) -> Vec<Broken> {
         let page_dir = url::page_dir(rel, self.site);
-        // `<base href>` moves where relative links start from
-        let base_dir = base_href.and_then(|b| match url::resolve(b, &page_dir, None, self.site) {
-            Target::Site(p) => {
-                let base = self
-                    .site
-                    .map_or("/", |s| s.base.as_str())
-                    .trim_end_matches('/');
-                let d = format!("{base}{p}");
-                Some(if d.ends_with('/') {
+        // `<base href>` moves where relative links start from: a folder of this host, or
+        // somewhere verify can't follow (another host, or any absolute URL without
+        // --base-url), where relative links are not this build's to judge
+        let base_dir = base_href.and_then(|b| {
+            let folder = |d: String| {
+                if d.ends_with('/') {
                     d
                 } else {
                     d.rsplit_once('/')
                         .map_or("/".into(), |(a, _)| format!("{a}/"))
-                })
+                }
+            };
+            match url::resolve(b, &page_dir, None, self.site) {
+                Target::Site(p) => {
+                    let base = self
+                        .site
+                        .map_or("/", |s| s.base.as_str())
+                        .trim_end_matches('/');
+                    Some(Some(folder(format!("{base}{p}"))))
+                }
+                Target::OutsideBase(p) => Some(Some(folder(p))),
+                Target::Elsewhere if !b.trim().is_empty() => Some(None),
+                _ => None,
             }
-            _ => None,
         });
         let mut seen = std::collections::BTreeSet::new();
         let mut broken = Vec::new();
         for r in refs {
-            // a canonical's href is the canonical checks' to judge, precisely: not a link too
-            if r.attribute.eq_ignore_ascii_case("href") && canonicals.contains(&r.written) {
-                continue;
-            }
-            let (check, path) =
-                match url::resolve(&r.written, &page_dir, base_dir.as_deref(), self.site) {
-                    Target::Elsewhere => continue,
-                    Target::AboveRoot => ("links.internal", String::new()),
-                    Target::OutsideBase(p) => ("links.outside_base", p),
-                    Target::Site(p) => {
-                        if self.ignore.iter().any(|re| re.is_match(&p))
-                            || self.files.file_for(&p).is_some()
-                        {
-                            continue;
-                        }
-                        // the SPA fallback serves unknown pages, not missing files
-                        if self.spa_fallback && !p.rsplit('/').next().unwrap_or("").contains('.') {
-                            continue;
-                        }
-                        ("links.internal", p)
+            let dir = match &base_dir {
+                Some(None) if url::is_relative(&r.written) => continue,
+                Some(Some(d)) => Some(d.as_str()),
+                _ => None,
+            };
+            let (check, path) = match url::resolve(&r.written, &page_dir, dir, self.site) {
+                Target::Elsewhere => continue,
+                Target::AboveRoot => ("links.internal", String::new()),
+                Target::OutsideBase(p) => ("links.outside_base", p),
+                Target::Site(p) => {
+                    if self.ignore.iter().any(|re| re.is_match(&p))
+                        || self.files.file_for(&p).is_some()
+                    {
+                        continue;
                     }
-                };
+                    // the SPA fallback serves unknown pages, not missing files
+                    if self.spa_fallback && !p.rsplit('/').next().unwrap_or("").contains('.') {
+                        continue;
+                    }
+                    ("links.internal", p)
+                }
+            };
             if seen.insert((r.attribute.clone(), r.written.clone())) {
                 broken.push(Broken {
                     attribute: r.attribute,
@@ -160,7 +162,7 @@ pub(crate) fn css_broken(
         let css = String::from_utf8_lossy(&std::fs::read(dir.join(sheets[i]))?).into_owned();
         Ok((
             sheets[i].clone(),
-            ctx.judge(sheets[i], None, &[], css_refs(&css)),
+            ctx.judge(sheets[i], None, css_refs(&css)),
         ))
     })
 }
@@ -203,8 +205,16 @@ fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
             regex::Regex::new(r"(?s)<!--.*?-->").unwrap(),
         )
     });
-    let head_cut = raw.char_indices().nth(2048).map_or(raw.len(), |(i, _)| i);
-    let is_document = doc_re.is_match(&raw[..head_cut]);
+    // the first 2 KB after a byte-order mark, whitespace and leading comments
+    let mut start = raw.trim_start_matches('\u{feff}').trim_start();
+    while let Some(rest) = start.strip_prefix("<!--") {
+        start = rest.split_once("-->").map_or("", |(_, r)| r).trim_start();
+    }
+    let head_cut = start
+        .char_indices()
+        .nth(2048)
+        .map_or(start.len(), |(i, _)| i);
+    let is_document = doc_re.is_match(&start[..head_cut]);
     let markup = markup_only(raw);
     let titled = without_foreign_titles(raw);
     let mut titles = title_re.captures_iter(&titled);
@@ -221,17 +231,10 @@ fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
                 _ => {}
             }
         }
-        let content = content.filter(|_| is_refresh)?;
-        // "0; url=/target/" (url= optional, quotes allowed)
-        let after = content.split_once(';').map_or("", |(_, r)| r).trim();
-        let url = after
-            .strip_prefix("url=")
-            .or_else(|| after.strip_prefix("URL="))
-            .unwrap_or(after);
-        let url = url.trim().trim_matches(['\'', '"']).to_string();
-        (!url.is_empty()).then_some(url)
+        refresh_url(&content.filter(|_| is_refresh)?)
     });
-    let base_href = base_re.find(&markup).and_then(|m| {
+    // the first <base> that has an href is the one browsers use
+    let base_href = base_re.find_iter(&markup).find_map(|m| {
         attr_re()
             .captures_iter(m.as_str())
             .find(|c| c[1].eq_ignore_ascii_case("href"))
@@ -247,7 +250,34 @@ fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
         }
     }
     let canonicals = tag_attrs(&markup, link_tag_re(), "rel", "canonical", "href");
-    let broken = ctx.judge(rel, base_href.as_deref(), &canonicals, html_refs(raw));
+    // a <base> or canonical href is not a link: <base> moves the others, and the
+    // canonical is the canonical checks' to judge, precisely. On a not-found page,
+    // served for any missing URL, `rel=alternate` links are for no one either: crawlers
+    // don't read a 404's head, and readers never follow it
+    let not_found = super::is_not_found_page(&rel.to_ascii_lowercase());
+    let not_links: Vec<(usize, usize)> = base_re
+        .find_iter(raw)
+        .chain(link_tag_re().find_iter(raw).filter(|m| {
+            attr_re().captures_iter(m.as_str()).any(|c| {
+                c[1].eq_ignore_ascii_case("rel")
+                    && attr_value(&c).split_ascii_whitespace().any(|r| {
+                        r.eq_ignore_ascii_case("canonical")
+                            || not_found && r.eq_ignore_ascii_case("alternate")
+                    })
+            })
+        }))
+        .map(|m| (m.start(), m.end()))
+        .collect();
+    let refs = if not_links.is_empty() {
+        html_refs(raw)
+    } else {
+        let mut cut = raw.to_string();
+        for (a, b) in not_links {
+            cut.replace_range(a..b, &" ".repeat(b - a));
+        }
+        html_refs(&cut)
+    };
+    let broken = ctx.judge(rel, base_href.as_deref(), refs);
     PageFacts {
         rel: rel.to_string(),
         is_document,
@@ -298,4 +328,115 @@ fn double_escaped(html: &str) -> Option<(String, String, usize)> {
         .collect::<Vec<_>>()
         .join(" ");
     Some((first.as_str().to_string(), context, 1 + found.count()))
+}
+
+/// The URL of a meta refresh's `content`, parsed as the HTML spec does: a number, then
+/// `;` or `,`, then an optional `url=` (any case, spaces around `=`), then the URL,
+/// quoted or not. None without a URL: that refresh reloads the page itself.
+pub(crate) fn refresh_url(content: &str) -> Option<String> {
+    let s = content.trim_start();
+    let time = s
+        .find(|c: char| !c.is_ascii_digit() && c != '.')
+        .unwrap_or(s.len());
+    if time == 0 {
+        return None;
+    }
+    let mut rest = s[time..].trim_start();
+    if let Some(r) = rest.strip_prefix([';', ',']) {
+        rest = r.trim_start();
+    }
+    if rest.get(..3).is_some_and(|u| u.eq_ignore_ascii_case("url")) {
+        if let Some(r) = rest[3..].trim_start().strip_prefix('=') {
+            rest = r.trim_start();
+        }
+    }
+    let url = match rest.chars().next() {
+        Some(q @ ('"' | '\'')) => rest[1..].split(q).next().unwrap_or(""),
+        _ => rest,
+    };
+    let url = url.trim();
+    (!url.is_empty()).then(|| url.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn meta_refresh_is_read_as_the_spec_reads_it() {
+        for (content, want) in [
+            ("0; url=/target/", Some("/target/")),
+            ("0;URL=/target/", Some("/target/")),
+            ("0;Url=/target/", Some("/target/")),
+            ("0; url = /target/", Some("/target/")),
+            ("0,url=/target/", Some("/target/")),
+            ("0; url='/target/'", Some("/target/")),
+            ("0; url=\"/target/\" ", Some("/target/")),
+            ("0;/target/", Some("/target/")),
+            ("3.5; URL=https://x.example/", Some("https://x.example/")),
+            ("0", None),
+            ("5;", None),
+            ("url=/x/", None),
+        ] {
+            assert_eq!(refresh_url(content).as_deref(), want, "{content}");
+        }
+    }
+
+    fn page(rel: &str, html: &str) -> PageFacts {
+        let files = Files::new(["a/index.html".to_string()], false);
+        let ctx = LinkCtx {
+            site: None,
+            files: &files,
+            ignore: &[],
+            spa_fallback: false,
+        };
+        facts(rel, html, &ctx)
+    }
+
+    fn broken(f: &PageFacts) -> Vec<&str> {
+        f.broken.iter().map(|b| b.written.as_str()).collect()
+    }
+
+    /// <base> (stress site s2 of the held-out review): its own href is not a link, the
+    /// first one with an href counts, and an absolute base verify can't place leaves
+    /// relative links unjudged rather than resolving them from the page.
+    #[test]
+    fn base_href_as_browsers_use_it() {
+        let f = page(
+            "p/index.html",
+            r#"<html><head><base href="/a/"></head><body><a href="index.html">x</a><a href="gone/">y</a></body></html>"#,
+        );
+        assert_eq!(broken(&f), ["gone/"]);
+        let f = page(
+            "p/index.html",
+            r#"<html><head><base target="_blank"><base href="/a/"></head><body><a href="index.html">x</a></body></html>"#,
+        );
+        assert!(broken(&f).is_empty(), "{:?}", broken(&f));
+        let f = page(
+            "p/index.html",
+            r#"<html><head><base href="https://cdn.example/x/"></head><body><a href="index.html">x</a><a href="/gone/">y</a></body></html>"#,
+        );
+        assert_eq!(broken(&f), ["/gone/"]);
+    }
+
+    /// The canonical's href is not also a link, but another tag with the same href is.
+    #[test]
+    fn a_canonical_is_not_a_link_but_its_twin_is() {
+        let f = page(
+            "p/index.html",
+            r#"<html><head><link rel="canonical" href="/gone/"></head><body><a href="/gone/">x</a></body></html>"#,
+        );
+        assert_eq!(broken(&f), ["/gone/"]);
+        assert_eq!(f.canonicals, ["/gone/"]);
+    }
+
+    #[test]
+    fn a_doctype_after_a_long_comment_is_a_document() {
+        let html = format!(
+            "\u{feff}<!-- {} -->\n<!doctype html><html><head><title>t</title></head></html>",
+            "x".repeat(4000)
+        );
+        assert!(page("p/index.html", &html).is_document);
+        assert!(!page("v.html", "google-site-verification: abc.html").is_document);
+    }
 }

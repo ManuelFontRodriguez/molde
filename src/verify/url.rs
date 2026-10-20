@@ -27,6 +27,10 @@ impl Address {
             return None;
         }
         let path = rest[host_end..].trim_end_matches('/');
+        // an address is a scheme, a host and a path: a query or fragment is not a base
+        if host.contains(['?', '#', '@']) || path.contains(['?', '#']) {
+            return None;
+        }
         Some(Self {
             origin: format!("{}{}", &lower[..scheme_end], host.to_ascii_lowercase()),
             base: format!("{path}/"),
@@ -64,9 +68,24 @@ impl Address {
     }
 }
 
+/// `s` without an ASCII `prefix` matched in any case. Compared as bytes: `s` may hold
+/// any text (`カテゴリ/`), and a cut inside a character would panic.
 fn strip_ci<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
-    (s.len() >= prefix.len() && s[..prefix.len()].eq_ignore_ascii_case(prefix))
+    s.as_bytes()
+        .get(..prefix.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(prefix.as_bytes()))
         .then(|| &s[prefix.len()..])
+}
+
+/// Is `written` relative to the page's folder (no scheme, not root-relative, not a bare
+/// fragment or query)? Those are the links a `<base href>` moves.
+pub(crate) fn is_relative(written: &str) -> bool {
+    let v = unescape_entities(written.trim());
+    !(v.is_empty()
+        || v.starts_with(['/', '#', '?'])
+        || v.split(['/', '?', '#'])
+            .next()
+            .is_some_and(|first| first.contains(':')))
 }
 
 /// What a written URL means for this build.
@@ -105,13 +124,20 @@ pub(crate) fn resolve(
     if value.starts_with("//") || scheme.is_match(&value) {
         return Target::Elsewhere;
     }
-    let path = percent_decode(value.split(['?', '#']).next().unwrap_or(""));
+    // %-escapes are decoded per segment, after the split: `%2F` is part of a name, not a
+    // separator, so `a%2Fb` names no file rather than `a/b`
+    let path = value.split(['?', '#']).next().unwrap_or("");
     let dir = base_href.unwrap_or(page_dir);
     let joined = if path.starts_with('/') {
-        path
+        path.to_string()
     } else {
         format!("{dir}{path}")
     };
+    let decoded: Vec<String> = joined
+        .split('/')
+        .map(|seg| percent_decode(seg).replace('/', "%2F"))
+        .collect();
+    let joined = decoded.join("/");
     let mut segments: Vec<&str> = Vec::new();
     let trailing = joined.ends_with('/') || joined.ends_with("/.") || joined.ends_with("/..");
     for seg in joined.split('/').skip(1) {
@@ -237,6 +263,14 @@ mod tests {
         assert_eq!(a.base, "/repo/");
         assert_eq!(Address::parse("https://x.example").unwrap().base, "/");
         assert!(Address::parse("ftp://x").is_none());
+        for bad in [
+            "example.com",
+            "https://",
+            "https://x.example/?q",
+            "https://x.example/#f",
+        ] {
+            assert!(Address::parse(bad).is_none(), "{bad}");
+        }
         assert_eq!(a.url_of("/x/"), "https://user.github.io/repo/x/");
     }
 
@@ -293,6 +327,27 @@ mod tests {
         assert_eq!(
             resolve("/a?q=1#f", "/", None, None),
             Target::Site("/a".into())
+        );
+    }
+
+    /// Non-ASCII hrefs used to panic (VitePress's ja/zh pages); `%2F` is not a separator.
+    #[test]
+    fn any_text_and_escaped_slashes() {
+        let site = Address::parse("https://x.example").unwrap();
+        let s = Some(&site);
+        for written in ["カテゴリ/", "ü", "日本語/ページ.html", "h"] {
+            assert!(
+                matches!(resolve(written, "/a/", None, s), Target::Site(_)),
+                "{written}"
+            );
+        }
+        assert_eq!(
+            resolve("caf%C3%A9/", "/", None, s),
+            Target::Site("/café/".into())
+        );
+        assert_eq!(
+            resolve("%2Fother%2Fx.html", "/a/", None, s),
+            Target::Site("/a/%2Fother%2Fx.html".into())
         );
     }
 

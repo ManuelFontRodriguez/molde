@@ -58,31 +58,65 @@ impl Kind {
 }
 
 /// Files that mean "this folder is a project, not its build output", and the output
-/// folder each generator writes.
-const PROJECT_MARKERS: [(&str, &str); 9] = [
+/// folder each generator writes. `package.json` alone is the fallback (`dist/`).
+const PROJECT_MARKERS: [(&str, &str); 24] = [
     ("hugo.toml", "public"),
     ("hugo.yaml", "public"),
+    ("hugo.json", "public"),
     ("config.toml", "public"),
     ("zola.toml", "public"),
     ("astro.config.mjs", "dist"),
     ("astro.config.ts", "dist"),
+    ("astro.config.js", "dist"),
     ("next.config.ts", "out"),
     ("next.config.js", "out"),
+    ("next.config.mjs", "out"),
     ("eleventy.config.js", "_site"),
+    ("eleventy.config.mjs", "_site"),
+    ("eleventy.config.cjs", "_site"),
+    (".eleventy.js", "_site"),
+    ("docusaurus.config.js", "build"),
+    ("docusaurus.config.ts", "build"),
+    ("svelte.config.js", "build"),
+    ("gatsby-config.js", "public"),
+    ("gatsby-config.ts", "public"),
+    ("mkdocs.yml", "site"),
+    ("mkdocs.yaml", "site"),
+    ("_config.yml", "_site"),
+    (".vitepress", ".vitepress/dist"),
 ];
+
+/// `--base-url` as the command line takes it: an http(s) address, a host and an
+/// optional path, no query or fragment. The error says what was wrong.
+pub fn parse_base_url(s: &str) -> std::result::Result<String, String> {
+    match Address::parse(s) {
+        Some(_) => Ok(s.to_string()),
+        None => Err(format!(
+            "`{s}` is not a site address: give http(s), a host and an optional base path, \
+             no query or fragment (https://example.com/ or https://user.github.io/repo/)"
+        )),
+    }
+}
+
+/// `--spa-fallback` must name a file of the build: the host serves it for unknown paths,
+/// and a fallback that isn't there would excuse every broken page link.
+pub fn spa_fallback_error(dir: &Path, fallback: &str) -> Option<String> {
+    let rel = fallback.trim_start_matches('/');
+    (dir.is_dir() && (rel.is_empty() || !dir.join(rel).is_file())).then(|| {
+        format!(
+            "--spa-fallback {fallback}: no such file in {}",
+            dir.display()
+        )
+    })
+}
 
 pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
     let started = std::time::Instant::now();
     if let Some(stop) = refusal(dir) {
-        return Ok(report(
-            dir,
-            started,
-            json!({}),
-            0,
-            vec![stop],
-            vec![],
-            vec![],
-        ));
+        // stopped before reading anything, as check's stops: `build` is null
+        let mut r = finish(dir, started, json!({}), 0, vec![stop], vec![], vec![]);
+        r["build"] = Value::Null;
+        return Ok(r);
     }
     let all = scan::all_files(dir)?;
     let html = scan::html_files(dir)?;
@@ -104,7 +138,7 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
     let css = scan::css_broken(dir, &all, &ctx(given.as_ref()))?;
     let claimed = claimed_address(&facts, &files);
     let broken: Vec<&[Broken]> = facts.iter().map(|f| f.broken.as_slice()).collect();
-    let run = judge(
+    let mut run = judge(
         dir,
         &facts,
         &broken,
@@ -116,7 +150,7 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
     )?;
     if run.documents == 0 {
         let e = json!({"layer": "output", "check": "verify.no_pages", "dir": dir.display().to_string()});
-        return Ok(report(
+        return Ok(finish(
             dir,
             started,
             run.counts,
@@ -126,11 +160,27 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
             vec![],
         ));
     }
+    if given.is_none() {
+        let mut s = json!({"checks": "canonical, sitemap, robots, own-address links", "reason": "no --base-url"});
+        if let Some(c) = &claimed {
+            let c = c.url_of("/");
+            s["suggestion"] = json!(format!(
+                "the pages' canonicals use {c}: run with --base-url {c}"
+            ));
+        }
+        run.skipped.push(s);
+    }
     // one cause, one error (R2): when the pages themselves claim another address than
     // --base-url, and that address explains most of the errors away, say so once. Errors
     // that remain under both addresses are real whichever is right, and stay.
-    if let (Some(given), Some(claimed)) = (&given, &claimed) {
-        if !url::same_url(&given.url_of("/"), &claimed.url_of("/")) && run.errors.len() >= 3 {
+    // Without --base-url the build is read as served from `/`: a base-path build
+    // (`https://user.github.io/repo/`) is the same single cause.
+    if let Some(claimed) = &claimed {
+        let differs = match &given {
+            Some(given) => !url::same_url(&given.url_of("/"), &claimed.url_of("/")),
+            None => claimed.base != "/",
+        };
+        if differs && run.errors.len() >= 3 {
             let html_b = scan::html_broken(dir, &html, &ctx(Some(claimed)))?;
             let css_b = scan::css_broken(dir, &all, &ctx(Some(claimed)))?;
             let broken_b: Vec<&[Broken]> = html_b.iter().map(Vec::as_slice).collect();
@@ -149,31 +199,29 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
                 let in_both: BTreeSet<String> = other.errors.iter().map(key).collect();
                 let mut errors = vec![
                     json!({"layer": "output", "check": "verify.base_url_mismatch",
-                                             "given": given.url_of("/"), "found": claimed.url_of("/")}),
+                    "given": given.as_ref().map(|g| g.url_of("/")), "found": claimed.url_of("/")}),
                 ];
                 errors.extend(run.errors.into_iter().filter(|e| in_both.contains(&key(e))));
+                // the wrong address's warnings (pages "missing" from a sitemap it can't
+                // read) are the same cause: only what holds under both stays
+                let w_key = |w: &Value| format!("{}|{}", w["check"], w["page"]);
+                let w_both: BTreeSet<String> = other.warnings.iter().map(w_key).collect();
+                let warnings = run
+                    .warnings
+                    .into_iter()
+                    .filter(|w| w_both.contains(&w_key(w)))
+                    .collect();
                 return Ok(finish(
                     dir,
                     started,
                     run.counts,
                     all.len(),
                     errors,
-                    run.warnings,
+                    warnings,
                     run.skipped,
                 ));
             }
         }
-    }
-    let mut skipped = run.skipped;
-    if given.is_none() {
-        let mut s = json!({"checks": "canonical, sitemap, robots, own-address links", "reason": "no --base-url"});
-        if let Some(c) = &claimed {
-            let c = c.url_of("/");
-            s["suggestion"] = json!(format!(
-                "the pages' canonicals use {c}: run with --base-url {c}"
-            ));
-        }
-        skipped.push(s);
     }
     Ok(finish(
         dir,
@@ -182,7 +230,7 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
         all.len(),
         run.errors,
         run.warnings,
-        skipped,
+        run.skipped,
     ))
 }
 
@@ -220,11 +268,13 @@ fn judge(
         warnings: Vec::new(),
         skipped: Vec::new(),
     };
-    run.errors.extend(links(facts, broken, css, files, opts));
+    run.errors.extend(links(facts, broken, css));
     let (e, w) = uniqueness(facts, &kinds, opts.unique);
     run.errors.extend(e);
     run.warnings.extend(w);
     run.errors.extend(page_content(facts, &kinds));
+    run.errors
+        .extend(redirects(facts, &kinds, site, files, &kind_of, &ignored));
     if let Some(site) = site {
         run.errors.extend(canonicals(
             facts, &kinds, site, files, &kind_of, opts, &ignored,
@@ -240,6 +290,7 @@ fn judge(
         run.skipped
             .push(json!({"checks": "og", "reason": "Open Graph is opt-in: --og"}));
     }
+    run.errors = one_cause(std::mem::take(&mut run.errors), files, opts);
     Ok(run)
 }
 
@@ -271,7 +322,7 @@ fn refusal(dir: &Path) -> Option<Value> {
     }
     let marker = PROJECT_MARKERS
         .iter()
-        .find(|(f, _)| dir.join(f).is_file())
+        .find(|(f, _)| dir.join(f).exists())
         .map(|(f, out)| (*f, *out))
         .or_else(|| {
             dir.join("package.json")
@@ -291,15 +342,7 @@ fn classify(facts: &[PageFacts], site: Option<&Address>, files: &Files) -> Vec<K
             let rel = f.rel.to_ascii_lowercase();
             if !f.is_document {
                 Kind::NotDocument
-            } else if [
-                "404.html",
-                "404/index.html",
-                "_not-found/index.html",
-                "_not-found.html",
-                "200.html",
-            ]
-            .contains(&rel.as_str())
-            {
+            } else if is_not_found_page(&rel) {
                 Kind::NotFound
             } else if f.refresh.is_some() || canonical_elsewhere(f, site, files) {
                 Kind::Redirect
@@ -310,6 +353,18 @@ fn classify(facts: &[PageFacts], site: Option<&Address>, files: &Files) -> Vec<K
             }
         })
         .collect()
+}
+
+/// A page hosts serve for a missing URL: `404.html` at any depth (a locale's own,
+/// `fr/404.html`, as Docusaurus and Hugo write them), Next.js's `_not-found`, and the
+/// root `200.html` single-page apps fall back to. `rel` is lower-cased.
+pub(crate) fn is_not_found_page(rel: &str) -> bool {
+    let name = |n: &str| rel == n || rel.ends_with(&format!("/{n}"));
+    name("404.html")
+        || name("404/index.html")
+        || name("_not-found.html")
+        || name("_not-found/index.html")
+        || rel == "200.html"
 }
 
 /// Does the page's canonical name another file of this build (an alias, a pager)?
@@ -377,56 +432,88 @@ fn counts(kinds: &[Kind]) -> Value {
     json!(c)
 }
 
-/// links.internal and links.outside_base, from the broken links the scan found, and the
-/// grouped causes (§6). `html` is each page's broken links, in `facts` order.
-fn links(
-    facts: &[PageFacts],
-    html: &[&[Broken]],
-    css: &[(String, Vec<Broken>)],
-    files: &Files,
-    opts: &VerifyOptions,
-) -> Vec<Value> {
-    let mut internal = Vec::new();
-    let mut outside = Vec::new();
+/// links.internal and links.outside_base, from the broken links the scan found, each
+/// with the site path it names in `_path` (for `one_cause`). `html` is each page's
+/// broken links, in `facts` order.
+fn links(facts: &[PageFacts], html: &[&[Broken]], css: &[(String, Vec<Broken>)]) -> Vec<Value> {
     let pages = facts
         .iter()
         .map(|f| f.rel.as_str())
         .zip(html.iter().copied());
     let sheets = css.iter().map(|(rel, b)| (rel.as_str(), b.as_slice()));
+    let mut errors = Vec::new();
     for (rel, broken) in pages.chain(sheets) {
         for b in broken {
-            let e = json!({"layer": "output", "check": b.check, "page": rel, "attribute": b.attribute,
-                           "broken_href": b.written});
-            if b.check == "links.internal" {
-                internal.push((e, b.path.clone()));
-            } else {
-                outside.push((e, b.path.clone()));
-            }
+            errors.push(
+                json!({"layer": "output", "check": b.check, "page": rel, "attribute": b.attribute,
+                               "broken_href": b.written, "_path": b.path}),
+            );
         }
     }
-    let mut errors: Vec<Value> = Vec::new();
-    // one cause, one error: most broken links would resolve with clean URLs
-    let clean: Vec<usize> = (0..internal.len())
-        .filter(|&i| !opts.clean_urls && files.would_resolve_clean(&internal[i].1))
-        .collect();
-    if clean.len() >= 3 && clean.len() * 2 > internal.len() {
-        let examples: Vec<Value> = clean
-            .iter()
-            .take(5)
-            .map(|&i| internal[i].0["broken_href"].clone())
-            .collect();
-        errors.push(json!({"layer": "output", "check": "links.clean_urls", "count": clean.len(), "examples": examples}));
-        let drop: BTreeSet<usize> = clean.into_iter().collect();
-        internal = internal
-            .into_iter()
-            .enumerate()
-            .filter(|(i, _)| !drop.contains(i))
-            .map(|(_, x)| x)
-            .collect();
-    }
-    errors.extend(group_by_target(internal));
-    errors.extend(group_by_target(outside));
     errors
+}
+
+/// The checks whose errors name a missing page of the site (in `_path`).
+const MISSING_TARGET: [&str; 4] = [
+    "links.internal",
+    "canonical.target_missing",
+    "redirect.target_missing",
+    "sitemap.dangling",
+];
+
+/// One cause, one error (§6), over every check that names a missing page: when most of
+/// them would resolve with clean URLs, that is one `links.clean_urls` error (`count`,
+/// `by_check`, `examples`) instead of each. Then links to the same missing target from
+/// three or more pages are one error each. `_path` is dropped.
+fn one_cause(errors: Vec<Value>, files: &Files, opts: &VerifyOptions) -> Vec<Value> {
+    let path = |e: &Value| e["_path"].as_str().unwrap_or("").to_string();
+    let missing = |e: &Value| MISSING_TARGET.contains(&e["check"].as_str().unwrap_or(""));
+    let clean = |e: &Value| !opts.clean_urls && missing(e) && files.would_resolve_clean(&path(e));
+    let n_missing = errors.iter().filter(|e| missing(e)).count();
+    let n_clean = errors.iter().filter(|e| clean(e)).count();
+    let mut out = Vec::new();
+    let errors = if n_clean >= 3 && n_clean * 2 > n_missing {
+        let mut by_check: BTreeMap<String, usize> = BTreeMap::new();
+        let mut examples = Vec::new();
+        let mut kept = Vec::new();
+        for e in errors {
+            if clean(&e) {
+                *by_check
+                    .entry(e["check"].as_str().unwrap_or("").into())
+                    .or_default() += 1;
+                if examples.len() < 5 {
+                    examples.push(json!(path(&e)));
+                }
+            } else {
+                kept.push(e);
+            }
+        }
+        out.push(
+            json!({"layer": "output", "check": "links.clean_urls", "count": n_clean,
+                        "by_check": by_check, "examples": examples}),
+        );
+        kept
+    } else {
+        errors
+    };
+    let mut internal = Vec::new();
+    let mut outside = Vec::new();
+    let mut rest = Vec::new();
+    for mut e in errors {
+        let p = path(&e);
+        if let Some(o) = e.as_object_mut() {
+            o.remove("_path");
+        }
+        match e["check"].as_str() {
+            Some("links.internal") => internal.push((e, p)),
+            Some("links.outside_base") => outside.push((e, p)),
+            _ => rest.push(e),
+        }
+    }
+    out.extend(group_by_target(internal));
+    out.extend(group_by_target(outside));
+    out.extend(rest);
+    out
 }
 
 /// One cause, one error (§6): links to the same missing page, however each was written,
@@ -467,12 +554,17 @@ fn group_by_target(errors: Vec<(Value, String)>) -> Vec<Value> {
 /// its siblings without being a duplicate anyone searches for.
 fn is_list_page(rel: &str) -> bool {
     let segs: Vec<&str> = rel.split('/').collect();
-    let pager = segs
-        .windows(2)
-        .any(|w| w[0] == "page" && w[1].chars().all(|c| c.is_ascii_digit()) && !w[1].is_empty());
-    let taxonomy = matches!(
-        segs.first().copied(),
-        Some(
+    let number = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
+    // `page/2/` (Hugo, Eleventy, Astro) and Jekyll's `page2/`
+    let pager = segs.windows(2).any(|w| w[0] == "page" && number(w[1]))
+        || segs
+            .iter()
+            .any(|s| s.strip_prefix("page").is_some_and(number));
+    // a taxonomy folder at any depth (`tags/x/`, `fr/tags/x/`, `blog/category/x/`)
+    let folders = &segs[..segs.len().saturating_sub(1)];
+    let taxonomy = folders.iter().any(|s| {
+        matches!(
+            *s,
             "tags"
                 | "tag"
                 | "categories"
@@ -482,7 +574,7 @@ fn is_list_page(rel: &str) -> bool {
                 | "archive"
                 | "archives"
         )
-    );
+    });
     pager || taxonomy
 }
 
@@ -532,7 +624,49 @@ fn uniqueness(facts: &[PageFacts], kinds: &[Kind], unique: bool) -> (Vec<Value>,
             firsts.entry(value).or_insert(&f.rel);
         }
     }
-    (errors, warnings)
+    (group_duplicates(errors), group_duplicates(warnings))
+}
+
+/// Pages sharing one value with the same first holder, past this many, are one entry.
+const DUPLICATES_LISTED: usize = 10;
+
+/// One cause, one entry: a value many pages share (a theme's default description on
+/// every post) is reported once, where its first duplicate was, with `count` and the
+/// first `examples`, instead of once per page.
+fn group_duplicates(found: Vec<Value>) -> Vec<Value> {
+    let key = |e: &Value| {
+        let value = e.get("title").or(e.get("description")).cloned();
+        (
+            e["check"].to_string(),
+            value.map(|v| v.to_string()),
+            e["duplicate_of"].to_string(),
+        )
+    };
+    let mut sizes: BTreeMap<_, usize> = BTreeMap::new();
+    for e in &found {
+        *sizes.entry(key(e)).or_default() += 1;
+    }
+    let mut groups: BTreeMap<_, usize> = BTreeMap::new();
+    let mut out: Vec<Value> = Vec::new();
+    for e in found {
+        let k = key(&e);
+        let n = sizes[&k];
+        if n <= DUPLICATES_LISTED {
+            out.push(e);
+        } else if let Some(&at) = groups.get(&k) {
+            let examples = out[at]["examples"].as_array_mut().unwrap();
+            if examples.len() < 5 {
+                examples.push(e["page"].clone());
+            }
+        } else {
+            let mut g = e.clone();
+            g["count"] = json!(n);
+            g["examples"] = json!([e["page"]]);
+            groups.insert(k, out.len());
+            out.push(g);
+        }
+    }
+    out
 }
 
 /// What each document must carry whatever the site's address: one title, text escaped
@@ -577,8 +711,50 @@ fn page_content(facts: &[PageFacts], kinds: &[Kind]) -> Vec<Value> {
     errors
 }
 
-/// The canonicals that exist, judged (§5): off the site, to a missing page, to a noindex
-/// page; a redirect's target that leads nowhere; and with --require-canonical, a missing one.
+/// A redirect's target (§5), with or without --base-url: a meta refresh, or a canonical
+/// to another page, must lead to a page of the build, and a canonical must not hand the
+/// page's ranking to one that asks not to be indexed. Absolute targets need the address.
+fn redirects(
+    facts: &[PageFacts],
+    kinds: &[Kind],
+    site: Option<&Address>,
+    files: &Files,
+    kind_of: &BTreeMap<&str, Kind>,
+    ignored: &dyn Fn(&str) -> bool,
+) -> Vec<Value> {
+    let mut errors = Vec::new();
+    for (f, k) in facts.iter().zip(kinds) {
+        if *k != Kind::Redirect {
+            continue;
+        }
+        let by_canonical = f.refresh.is_none();
+        let Some(t) = f.refresh.as_ref().or(f.canonicals.first()) else {
+            continue;
+        };
+        let page_dir = url::page_dir(&f.rel, site);
+        if let Target::Site(p) = url::resolve(t, &page_dir, None, site) {
+            match files.file_for(&p) {
+                None if !ignored(&p) => errors.push(
+                    json!({"layer": "output", "check": "redirect.target_missing", "page": f.rel, "target": t, "_path": p}),
+                ),
+                Some(file)
+                    if by_canonical
+                        && matches!(
+                            kind_of.get(file.as_str()),
+                            Some(Kind::Noindex | Kind::NotFound)
+                        ) =>
+                {
+                    errors.push(json!({"layer": "output", "check": "canonical.target_noindex", "page": f.rel, "found": t, "target": file}))
+                }
+                _ => {}
+            }
+        }
+    }
+    errors
+}
+
+/// The canonicals of pages that aren't redirects, judged (§5): off the site, to a missing
+/// page, to a noindex page; and with --require-canonical, a missing one.
 fn canonicals(
     facts: &[PageFacts],
     kinds: &[Kind],
@@ -593,26 +769,10 @@ fn canonicals(
         if !k.is_document() || *k == Kind::NotFound {
             continue;
         }
-        let page_dir = url::page_dir(&f.rel, Some(site));
         if *k == Kind::Redirect {
-            // a meta refresh, or a canonical to another page: its target must exist, and a
-            // canonical must not hand the page's ranking to one that asks not to be indexed
-            let by_canonical = f.refresh.is_none();
-            if let Some(t) = f.refresh.as_ref().or(f.canonicals.first()) {
-                if let Target::Site(p) = url::resolve(t, &page_dir, None, Some(site)) {
-                    match files.file_for(&p) {
-                        None if !ignored(&p) => {
-                            errors.push(json!({"layer": "output", "check": "redirect.target_missing", "page": f.rel, "target": t}))
-                        }
-                        Some(file) if by_canonical && matches!(kind_of.get(file.as_str()), Some(Kind::Noindex | Kind::NotFound)) => {
-                            errors.push(json!({"layer": "output", "check": "canonical.target_noindex", "page": f.rel, "found": t, "target": file}))
-                        }
-                        _ => {}
-                    }
-                }
-            }
             continue;
         }
+        let page_dir = url::page_dir(&f.rel, Some(site));
         let Some(canonical) = f.canonicals.first() else {
             if opts.require_canonical && *k == Kind::Indexable {
                 errors.push(json!({"layer": "output", "check": "canonical.missing", "page": f.rel,
@@ -622,7 +782,7 @@ fn canonicals(
         };
         match url::resolve(canonical, &page_dir, None, Some(site)) {
             Target::Site(p) => match files.file_for(&p) {
-                None if !ignored(&p) => errors.push(json!({"layer": "output", "check": "canonical.target_missing", "page": f.rel, "found": canonical})),
+                None if !ignored(&p) => errors.push(json!({"layer": "output", "check": "canonical.target_missing", "page": f.rel, "found": canonical, "_path": p})),
                 // a page naming itself is not pointing anywhere, noindex or not
                 Some(file) if file != f.rel && matches!(kind_of.get(file.as_str()), Some(Kind::Noindex | Kind::NotFound)) => {
                     errors.push(json!({"layer": "output", "check": "canonical.target_noindex", "page": f.rel, "found": canonical, "target": file}))
@@ -677,10 +837,13 @@ fn sitemap(
             .map(|s| s.to_string())
             .find(|s| dir.join(s).is_file())
     });
-    // robots.txt: it must name a sitemap that is in the build, and let crawlers in
+    // robots.txt: a Sitemap line must name a sitemap that is in the build, and with a
+    // sitemap in the build, one must name it (a robots.txt without Sitemap lines is valid
+    // when there is no sitemap: that is sitemap.not_found's warning); and let crawlers in
     let indexable = kinds.contains(&Kind::Indexable);
     if robots_text.is_some() {
-        if !named.iter().any(|u| file_of_url(u).is_some()) {
+        let names_one = named.iter().any(|u| file_of_url(u).is_some());
+        if !names_one && (!named.is_empty() || entry.is_some()) {
             errors.push(json!({"layer": "output", "check": "robots.sitemap_missing", "file": "robots.txt",
                                "expected": entry.as_ref().map(|e| site.url_of(&format!("/{e}"))), "found": named}));
         }
@@ -702,7 +865,14 @@ fn sitemap(
     for loc in &locs {
         match url::resolve(loc, &site.base, None, Some(site)) {
             Target::Site(p) => match files.file_for(&p) {
-                None => errors.push(json!({"layer": "output", "check": "sitemap.dangling", "loc": loc})),
+                None => {
+                    // a loc that resolves only with clean URLs still names its page: the
+                    // cause is links.clean_urls's, not a page missing from the sitemap
+                    if !opts.clean_urls && files.would_resolve_clean(&p) {
+                        listed.insert(format!("{}.html", p.trim_matches('/')));
+                    }
+                    errors.push(json!({"layer": "output", "check": "sitemap.dangling", "loc": loc, "_path": p}))
+                }
                 Some(file) => {
                     match kind_of.get(file.as_str()) {
                         Some(Kind::Noindex | Kind::NotFound) => {
@@ -739,10 +909,11 @@ fn sitemap_locs(
     entry: &str,
     file_of_url: &dyn Fn(&str) -> Option<String>,
 ) -> Vec<String> {
-    let loc_re = regex::Regex::new(
-        r"(?s)<(?:\w+:)?loc>\s*(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?\s*</(?:\w+:)?loc>",
-    )
-    .unwrap();
+    // a page's <loc>, namespaced or not, but not an extension's (<image:loc> names an
+    // image, often on a CDN, not a page of the site)
+    let loc_re =
+        regex::Regex::new(r"(?s)<(\w+:)?loc>\s*(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?\s*</(?:\w+:)?loc>")
+            .unwrap();
     let read = |rel: &str| {
         std::fs::read(dir.join(rel))
             .ok()
@@ -751,7 +922,14 @@ fn sitemap_locs(
     let locs = |xml: &str| -> Vec<String> {
         loc_re
             .captures_iter(xml)
-            .map(|c| crate::check::html::unescape_entities(c[1].trim()))
+            .filter(|c| {
+                !c.get(1).is_some_and(|p| {
+                    ["image:", "video:", "news:", "xhtml:"]
+                        .iter()
+                        .any(|x| p.as_str().eq_ignore_ascii_case(x))
+                })
+            })
+            .map(|c| crate::check::html::unescape_entities(c[2].trim()))
             .collect()
     };
     let Some(xml) = read(entry) else {
@@ -805,7 +983,7 @@ fn hint(check: &str) -> Option<&'static str> {
     Some(match check {
         "links.internal" => "the page links to a file the build doesn't have: fix the link, or the page it should reach is missing",
         "links.outside_base" => "a root-relative link that skips the site's base path: it works on disk, but in production it leaves the site; write it relative, or with the base path",
-        "links.clean_urls" => "most broken links would resolve if the host serves /a from a.html: if yours does (Netlify, Vercel, Cloudflare Pages, GitHub Pages), run with --clean-urls",
+        "links.clean_urls" => "most missing pages (links, canonicals, redirects, sitemap entries: `by_check`) would resolve if the host serves /a from a.html: if yours does (Netlify, Vercel, Cloudflare Pages, GitHub Pages), run with --clean-urls",
         "titles.missing" => "the page has no <title>, or an empty one",
         "titles.multiple" => "the page has more than one <title>",
         "titles.duplicate" => "two indexable pages share a title, so search results can't tell them apart",
@@ -823,12 +1001,12 @@ fn hint(check: &str) -> Option<&'static str> {
         "sitemap.non_canonical_listed" => "the sitemap lists a page whose canonical is another page: list the canonical one",
         "sitemap.missing_page" => "an indexable page the sitemap doesn't list (a warning unless --sitemap-complete)",
         "sitemap.not_found" => "no sitemap in the build (robots.txt names none, and there is no sitemap.xml or sitemap-index.xml)",
-        "robots.sitemap_missing" => "robots.txt names no sitemap that is in the build",
+        "robots.sitemap_missing" => "the build has a sitemap that robots.txt doesn't name, or robots.txt names one the build doesn't have",
         "robots.blocks_all" => "robots.txt shuts every crawler out while the site has pages to index",
         "og.missing" => "the page lacks part of the Open Graph block (required by --og)",
         "og.title_mismatch" => "og:title and <title> say different things",
         "verify.no_pages" => "no HTML documents in this folder: is the build empty, or is this the wrong folder?",
-        "verify.base_url_mismatch" => "the site's own canonicals and sitemap use another address than --base-url: pass the address in `found` (or rebuild the site for the one you gave)",
+        "verify.base_url_mismatch" => "the site's own canonicals use another address than --base-url (or a base path, and no --base-url was given): pass the address in `found` (or rebuild the site for the one you gave)",
         "verify.project_root" => "this is the project's folder: run verify on its build output",
         _ => return None,
     })
