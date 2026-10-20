@@ -50,6 +50,9 @@ of release may change is in the reference's
   nothing until the startup check finished (minutes on a large site). The last good
   build is served while that check runs, and with no build yet a "first build in
   progress" page reloads itself until one publishes. Nothing to do.
+- `titles.multiple` counted an icon's `<title>` as a second page title when an SVG
+  sprite nests an `<svg>` inside a `<symbol>` (Sphinx's Furo theme does, on every page):
+  SVG and MathML are now skipped to their matching end tag. Nothing to do.
 
 ## 0.1.0 — 2026-10-19
 
