@@ -14,3 +14,5 @@ design record and the reference disagree, the reference is right; please report 
 - [i18n.md](i18n.md): locales, localized paths, translation groups and hreflang.
 - [cldr-formatting.md](cldr-formatting.md): dates and numbers for 529 locales from
   bundled Unicode CLDR data.
+- [asset.md](asset.md): `asset()`, content-hashed URLs for static files (#22). A draft, not
+  built: it re-checks the issue against the sites as they are now.
