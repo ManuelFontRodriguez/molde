@@ -848,10 +848,15 @@ pub fn output_errors(
                 let lang = html_re
                     .find(&html)
                     .and_then(|m| attrs(m.as_str()).remove("lang"));
-                if !lang
-                    .as_deref()
-                    .is_some_and(|l| l.eq_ignore_ascii_case(locale))
-                {
+                // the locale itself, or a more specific tag of it (`en-US` on an `en` page):
+                // both are valid, and say the same language
+                let matches = |l: &str| {
+                    l.eq_ignore_ascii_case(locale)
+                        || (l.len() > locale.len()
+                            && l.as_bytes()[locale.len()] == b'-'
+                            && l[..locale.len()].eq_ignore_ascii_case(locale))
+                };
+                if !lang.as_deref().is_some_and(matches) {
                     errors.push(serde_json::json!({
                         "layer": "output",
                         "check": "html.lang",

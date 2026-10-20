@@ -29,6 +29,10 @@ of release may change is in the reference's
   (`https://Example.com` and `https://example.com:443` are `https://example.com/`). A hand-written canonical that named
   the right page in another spelling used to fail; it passes. The path is still compared
   exactly. `std_head` always wrote the normal form, so molde's own pages are unaffected.
+- `html.lang` accepts a more specific tag of the page's locale: `<html lang="en-US">` on
+  an `en` page used to fail, though it is valid and names the same language. A region
+  of another language (`es-US` on an `en` page) still fails, and hreflang stays exact.
+  Nothing to do.
 
 ## 0.1.0 — 2026-10-19
 
