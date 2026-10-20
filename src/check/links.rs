@@ -2,7 +2,7 @@ use crate::build::par_map;
 use crate::check::html::{code_re, html_files, percent_decode, unescape_entities};
 use crate::check::read_page;
 use anyhow::Result;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -19,18 +19,15 @@ pub fn check_links(build_dir: &Path) -> Result<Vec<serde_json::Value>> {
 /// scheme) is this build's and is checked like `/books/x/`.
 pub fn check_links_for(build_dir: &Path, base_url: Option<&str>) -> Result<Vec<serde_json::Value>> {
     let own = base_url.and_then(SiteAddress::parse);
-    // whether a target resolves, asked of the disk once per target for the whole
-    // build: a site links to the same pages from thousands of pages
-    let resolves: std::sync::RwLock<HashMap<String, bool>> = Default::default();
+    // every file of the build, listed once, its name exactly as written: a disk that
+    // ignores case (macOS, Windows) would say `/Logo.webp` exists when the file is
+    // `logo.webp`, and the link would break on the host (S3, Linux)
+    let files = build_files(build_dir)?;
     let resolves_target = |target: &str| -> bool {
-        if let Some(&known) = resolves.read().unwrap().get(target) {
-            return known;
-        }
         let rel = target.trim_start_matches('/');
-        let found =
-            build_dir.join(rel).is_file() || build_dir.join(rel).join("index.html").is_file();
-        resolves.write().unwrap().insert(target.to_string(), found);
-        found
+        files.contains(rel)
+            || files.contains(&format!("{}/index.html", rel.trim_end_matches('/')))
+            || (rel.is_empty() && files.contains("index.html"))
     };
     let check = |from: &Path, refs: Vec<Ref>| -> Vec<serde_json::Value> {
         let base = url_dir(from);
@@ -74,6 +71,20 @@ pub fn check_links_for(build_dir: &Path, base_url: Option<&str>) -> Result<Vec<s
         .flatten(),
     );
     Ok(errors)
+}
+
+/// Every file of the build, as a `/`-separated path relative to it, names byte for byte.
+fn build_files(build_dir: &Path) -> Result<std::collections::HashSet<String>> {
+    let mut files = std::collections::HashSet::new();
+    for entry in walkdir::WalkDir::new(build_dir) {
+        let entry = entry?;
+        if entry.file_type().is_file() || (entry.file_type().is_symlink() && entry.path().is_file())
+        {
+            let rel = entry.path().strip_prefix(build_dir)?;
+            files.insert(rel.to_string_lossy().replace('\\', "/"));
+        }
+    }
+    Ok(files)
 }
 
 /// One URL as written in the page or stylesheet, and where.

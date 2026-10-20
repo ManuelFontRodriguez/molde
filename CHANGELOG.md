@@ -7,6 +7,14 @@ of release may change is in the reference's
 
 ## Unreleased
 
+### Changed
+
+- `links.internal` compares file names exactly, case included, on every file system. On
+  macOS (which ignores case by default) a link to `/Logo.webp` used to pass when the file is
+  `logo.webp`, and broke on the host (S3, Linux). A site with such a link now fails on every
+  machine: fix the spelling the report names. The build's files are listed once, instead of
+  asking the disk for each target.
+
 ### Fixed
 
 - `titles.duplicate` counts indexable pages only. A page carrying a robots noindex meta
