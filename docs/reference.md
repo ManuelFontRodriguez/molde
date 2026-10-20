@@ -885,8 +885,11 @@ reruns `check` when it settles. A failing check never publishes — the browser
 keeps the last good build. `--reload` (requires `--watch`) injects a polling
 snippet into served HTML at serve time only: build artifacts stay
 byte-deterministic, and dedup means an unchanged rebuild never refreshes tabs.
-A request that matches no file gets the build's `/404.html` as its body (status 404)
-when the site has one, the way nginx `error_page`, S3 and Netlify serve it.
+A request that matches no file gets the nearest `404.html` up its path as its body
+(status 404): `/de/missing/` gets `/de/404.html` when the build has one, else
+`/404.html`, else a plain "not found". That is how Cloudflare Pages serves misses, and
+how a prefixed locale shows its own 404 page. nginx `error_page`, S3/CloudFront and
+Netlify serve the root `/404.html` unless configured per prefix.
 
 `diff` covers every non-`.gz` file (pages **and** sitemap.xml — so its file count can be
 `pages + 1`). Detail is capped: 20 pages with detail, 200 diff lines per page. With

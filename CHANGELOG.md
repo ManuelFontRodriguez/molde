@@ -43,6 +43,9 @@ of release may change is in the reference's
   an `en` page used to fail, though it is valid and names the same language. A region
   of another language (`es-US` on an `en` page) still fails, and hreflang stays exact.
   Nothing to do.
+- `molde serve` answers a miss with the nearest `404.html` up its path, so a prefixed
+  locale's `/de/404.html` shows under `/de/`; it used to show the root `/404.html`
+  everywhere. Nothing to do.
 
 ## 0.1.0 — 2026-10-19
 

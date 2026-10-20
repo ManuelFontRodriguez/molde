@@ -354,3 +354,32 @@ fn events_refuses_hints_from_web_pages_elsewhere() {
     assert_eq!(status, 200);
     let _ = fs::remove_dir_all(&out);
 }
+
+/// A miss gets the nearest 404.html up its path (issue #11): a prefixed locale's
+/// /de/404.html answers under /de/, the root one everywhere else.
+#[test]
+fn a_miss_gets_the_nearest_404_page() {
+    let root = tmp("nearest404");
+    fs::create_dir_all(root.join("de/buecher")).unwrap();
+    fs::write(root.join("404.html"), "root 404").unwrap();
+    fs::write(root.join("de/404.html"), "de 404").unwrap();
+    fs::write(root.join("de/buecher/index.html"), "books").unwrap();
+    for (path, body) in [
+        ("/missing", "root 404"),
+        ("/en/missing/", "root 404"),
+        ("/de/missing", "de 404"),
+        ("/de/buecher/missing/", "de 404"),
+        ("/de/no/such/dir/x.html", "de 404"),
+        ("/dex/missing", "root 404"),
+    ] {
+        assert_eq!(
+            get(&root, path, false),
+            (404, body.as_bytes().to_vec()),
+            "{path}"
+        );
+    }
+    assert_eq!(get(&root, "/de/404.html", false).0, 200);
+    fs::remove_file(root.join("404.html")).unwrap();
+    assert_eq!(get(&root, "/missing", false), (404, b"not found".to_vec()));
+    let _ = fs::remove_dir_all(&root);
+}
