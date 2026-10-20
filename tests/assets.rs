@@ -428,3 +428,27 @@ fn robots_txt_must_name_the_sitemap_and_let_crawlers_in() {
     assert!(robots_errors(&dir).is_empty());
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn link_case_must_match_the_file_exactly() {
+    // the measure of done of #23: on a disk that ignores case (macOS), `is_file()` would
+    // find `a/logo.webp` for `/a/Logo.webp`; S3 and Linux servers don't. Both CI runners
+    // must fail it, and the exact spelling must pass.
+    let dir = site("case");
+    fs::create_dir_all(dir.join("static/a")).unwrap();
+    fs::write(dir.join("static/a/logo.webp"), [0u8, 1, 2]).unwrap();
+    fs::write(
+        dir.join("templates/i.j2"),
+        "<html><head>\n{{ std_head }}\n</head><body><img src=\"/a/Logo.webp\"><img src=\"/a/logo.webp\">\
+         <a href=\"/Index.html\">home</a></body></html>",
+    )
+    .unwrap();
+    let report = molde::build(&dir, &dir.join("out")).unwrap();
+    let errors = molde::testing::check_links(&report.build_dir).unwrap();
+    let broken: Vec<&str> = errors
+        .iter()
+        .map(|e| e["broken_href"].as_str().unwrap())
+        .collect();
+    assert_eq!(broken, ["/a/Logo.webp", "/Index.html"], "{errors:?}");
+    let _ = fs::remove_dir_all(&dir);
+}

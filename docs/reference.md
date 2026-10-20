@@ -748,10 +748,6 @@ stylesheet's folder), in `<style>` blocks and in `style` attributes. Entities an
   a badge on the wrong pages passes: the checks verify structure and links, not
   meaning. Text escaped twice is the one content error they catch
   (`html.double_escaped`); inside `<pre>`, `<code>` and `<textarea>` it is not checked.
-- **File-name case on macOS.** On a case-insensitive file system (the macOS default),
-  `links.internal` accepts `/Logo.png` when the file is `logo.png`. Linux servers and
-  S3 are case-sensitive, so the link breaks in production. A `check` on Linux (CI)
-  catches it.
 
 ## Security model
 
