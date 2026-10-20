@@ -95,6 +95,7 @@ minijinja, the Rust Jinja2 dialect. In a template:
 | `item` | the current element, on `foreach` routes |
 | `pagination` | on `paginate` routes: `n`, `pages`, `items` (this page's slice), `prev`, `next`, `links` (`[{n, path}]` for a pager) |
 | `page.path`, `page.url` | this page's public path (`/books/dune/`) and full URL |
+| `page.title`, `page.description`, `page.index` | the strings `std_head` prints and the page's `index` value, for extra tags (`twitter:title`) |
 | `std_head` | the head block: `<title>`, description, canonical and Open Graph, already escaped |
 
 - **Put `{{ std_head }}` inside `<head>`** and don't write `<title>`, canonical or `og:*`

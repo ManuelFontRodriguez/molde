@@ -419,6 +419,8 @@ variables:
 | `pagination` | `paginate` routes only | `n` (this page, from 1), `pages`, `per_page`, `total` (list length), `offset` (index of this page's first item, from 0), `items` (this page's slice), `prev` / `next` (public path like `/largest/page/2/`, or none), `links` (`[{n, path}]` for every page, for the pager) |
 | `page.path` | always | the public path of this page: `/books/dune/` for `/books/dune/index.html`, `/llms.txt` as is |
 | `page.url` | when `base_url` is set | `base_url` + `page.path`, byte-identical to the canonical and the sitemap `<loc>` |
+| `page.title` / `page.description` | where `std_head` prints them (`base_url` set, `.html` outputs) on routes that declare them | the route's `title` / `description` pattern rendered for this page, as plain text: the same strings as `<title>` and the meta description (escaped once wherever you print them). For extra tags such as `twitter:title`. Undefined elsewhere |
+| `page.index` | always | the route's `index` rule resolved for this page (`true` / `false`), for tags only indexable pages should carry |
 | `locale` | with `locales:` | the page's locale tag (`en`); the default locale on `locales: none` pages. Use it for `<html lang="{{ locale }}">` |
 | `locales` | with `locales:` | every site locale, default first |
 | `alternates` | with `locales:` | the page's locale versions, itself included, noindex ones too: `[{locale, path, url?}]` (`url` with `base_url`), no `x-default`, empty when the page exists in one locale only. For a language switcher (hreflang is the indexable subset) |

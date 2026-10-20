@@ -193,12 +193,12 @@ pub fn render_page(env: &Environment, site: &Site, page: &Page) -> Result<String
         .with_context(|| format!("template {}", page.template))?;
     // pre-escaped by its own render pass; UNDEFINED renders as empty when the
     // web-standards capability is off
-    let head = match std_head(env, site, page)? {
+    let meta = page_meta(env, site, page)?;
+    let head = match std_head(env, site, page, &meta)? {
         Some(block) => minijinja::Value::from_safe_string(block),
         None => minijinja::Value::UNDEFINED,
     };
-    let base =
-        context!(data => site.snapshot_value(), std_head => head, page => page_context(site, page));
+    let base = context!(data => site.snapshot_value(), std_head => head, page => page_context(site, page, meta));
     // `locale`, `locales`, `alternates` exist only under site.yaml `locales:`
     let base = match render_locale(site, page.locale.as_deref()) {
         Some(l) => context!(
@@ -223,16 +223,31 @@ pub fn render_page(env: &Environment, site: &Site, page: &Page) -> Result<String
     Ok(html)
 }
 
-/// `page` in the template context: where this page lives, so breadcrumbs, JSON-LD
-/// `url`/`@id` and "you are here" nav don't have to rebuild the route in data.json.
+/// `page` in the template context: where this page lives and how it is presented, so
+/// breadcrumbs, JSON-LD `url`/`@id`, "you are here" nav and extra tags (`twitter:title`,
+/// a tag only on indexable pages) don't have to rebuild the route in data.json.
 /// `path` is the public path (`/books/dune/`, `/llms.txt`); `url` is `page_url` of it,
 /// the same string canonical and the sitemap use, and exists only with a `base_url`.
-fn page_context(site: &Site, page: &Page) -> minijinja::Value {
-    let path = public_path(&page.path);
-    match &site.config.base_url {
-        Some(base) => context!(path => path, url => page_url(base, &page.path)),
-        None => context!(path => path),
+/// `title` / `description` are the strings `std_head` prints (plain text, see `Meta`);
+/// `index` is
+/// the route's `index` rule for this page.
+fn page_context(site: &Site, page: &Page, meta: Meta) -> minijinja::Value {
+    use minijinja::Value;
+    // a key that doesn't apply is left out, so it is undefined (`is defined`, `default`
+    // work), not none
+    let mut ctx: std::collections::BTreeMap<&str, Value> = std::collections::BTreeMap::new();
+    ctx.insert("path", Value::from(public_path(&page.path)));
+    ctx.insert("index", Value::from(page.index));
+    if let Some(t) = meta.title {
+        ctx.insert("title", Value::from(t));
     }
+    if let Some(d) = meta.description {
+        ctx.insert("description", Value::from(d));
+    }
+    if let Some(base_url) = &site.config.base_url {
+        ctx.insert("url", Value::from(page_url(base_url, &page.path)));
+    }
+    Value::from_iter(ctx)
 }
 
 /// Output path -> public path: "/books/dune/index.html" -> "/books/dune/", "/llms.txt" as is.
@@ -286,31 +301,22 @@ pub fn page_url(base_url: &str, path: &str) -> String {
     format!("{}{}", base_url.trim_end_matches('/'), pretty_path(path))
 }
 
-/// OG is all-or-nothing: a fragmentary block is worse than none. A noindex page
-/// has no canonical URL to claim, so it gets the robots meta and no OG at all.
-const STD_HEAD_TEMPLATE: &str = "{% if title %}<title>{{ title }}</title>\n{% endif %}\
-{% if description %}<meta name=\"description\" content=\"{{ description }}\">\n{% endif %}\
-{% if index %}<link rel=\"canonical\" href=\"{{ url }}\">\
-{% if title %}\n<meta property=\"og:title\" content=\"{{ title }}\">\n\
-{% if description %}<meta property=\"og:description\" content=\"{{ description }}\">\n{% endif %}\
-<meta property=\"og:url\" content=\"{{ url }}\">\n\
-<meta property=\"og:type\" content=\"website\">{% endif %}\
-{% for a in alternates %}\n<link rel=\"alternate\" hreflang=\"{{ a.hreflang }}\" href=\"{{ a.url }}\">{% endfor %}\
-{% else %}<meta name=\"robots\" content=\"noindex\">{% endif %}";
+/// A page's rendered `title` and `description` patterns (None when the route has none):
+/// rendered once, for `std_head` and for `page.title` / `page.description`. Only where
+/// `std_head` prints them (a `base_url`, an HTML output): a pattern nothing prints is
+/// never rendered, so it can't fail a build.
+#[derive(Default)]
+pub(crate) struct Meta {
+    pub title: Option<String>,
+    pub description: Option<String>,
+}
 
-/// Per-page head block — a pure function of (config, route, path, item).
-/// None when web-standards is off (no base_url in site.yaml) and for non-HTML
-/// outputs, which have no <head>.
-pub(crate) fn std_head(env: &Environment, site: &Site, page: &Page) -> Result<Option<String>> {
-    let Some(base) = &site.config.base_url else {
-        return Ok(None);
-    };
-    if !page.is_html() {
-        return Ok(None);
+pub(crate) fn page_meta(env: &Environment, site: &Site, page: &Page) -> Result<Meta> {
+    if site.config.base_url.is_none() || !page.is_html() {
+        return Ok(Meta::default());
     }
-    let url = page_url(base, &page.path);
     // The title pattern renders as PLAIN text (its ".txt" template has no autoescape);
-    // the std_head template below escapes it exactly once, in both element and
+    // the std_head template escapes it exactly once, in both element and
     // attribute contexts. Only the finished block is marked safe.
     let title = match &site.routes.routes[page.route].title {
         Some(_) => Some(
@@ -352,6 +358,37 @@ pub(crate) fn std_head(env: &Environment, site: &Site, page: &Page) -> Result<Op
         ),
         None => None,
     };
+    Ok(Meta { title, description })
+}
+
+/// OG is all-or-nothing: a fragmentary block is worse than none. A noindex page
+/// has no canonical URL to claim, so it gets the robots meta and no OG at all.
+const STD_HEAD_TEMPLATE: &str = "{% if title %}<title>{{ title }}</title>\n{% endif %}\
+{% if description %}<meta name=\"description\" content=\"{{ description }}\">\n{% endif %}\
+{% if index %}<link rel=\"canonical\" href=\"{{ url }}\">\
+{% if title %}\n<meta property=\"og:title\" content=\"{{ title }}\">\n\
+{% if description %}<meta property=\"og:description\" content=\"{{ description }}\">\n{% endif %}\
+<meta property=\"og:url\" content=\"{{ url }}\">\n\
+<meta property=\"og:type\" content=\"website\">{% endif %}\
+{% for a in alternates %}\n<link rel=\"alternate\" hreflang=\"{{ a.hreflang }}\" href=\"{{ a.url }}\">{% endfor %}\
+{% else %}<meta name=\"robots\" content=\"noindex\">{% endif %}";
+
+/// Per-page head block — a pure function of (config, route, path, item).
+/// None when web-standards is off (no base_url in site.yaml) and for non-HTML
+/// outputs, which have no <head>.
+pub(crate) fn std_head(
+    env: &Environment,
+    site: &Site,
+    page: &Page,
+    meta: &Meta,
+) -> Result<Option<String>> {
+    let Some(base) = &site.config.base_url else {
+        return Ok(None);
+    };
+    if !page.is_html() {
+        return Ok(None);
+    }
+    let url = page_url(base, &page.path);
     // The URL gets attr_escape and is marked safe: the same escape the environment's
     // formatter applies, done here once so the canonical is exactly page_url's string.
     let safe_url = |u: &str| minijinja::Value::from_safe_string(attr_escape(u));
@@ -370,8 +407,8 @@ pub(crate) fn std_head(env: &Environment, site: &Site, page: &Page) -> Result<Op
             .push(context!(hreflang => "x-default", url => safe_url(&page_url(base, &d.path))));
     }
     let block = env.get_template("__std_head.html")?.render(context!(
-        title => title,
-        description => description,
+        title => meta.title,
+        description => meta.description,
         index => page.index,
         url => safe_url(&url),
         alternates => alternates,
