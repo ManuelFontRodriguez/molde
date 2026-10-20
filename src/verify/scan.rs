@@ -24,6 +24,8 @@ pub(crate) struct PageFacts {
     /// The first `<base href>`, entities decoded: redirects resolve from it too.
     pub(crate) base_href: Option<String>,
     pub(crate) canonicals: Vec<String>,
+    /// The `<link rel="alternate">` hrefs (hreflang versions, feeds), as written.
+    pub(crate) alternates: Vec<String>,
     pub(crate) og_url: Vec<String>,
     pub(crate) og_title: Vec<String>,
     pub(crate) og_type: Vec<String>,
@@ -127,10 +129,15 @@ impl LinkCtx<'_> {
             let (check, path) = match url::resolve(&r.written, &page_dir, dir, self.site) {
                 Target::Elsewhere => continue,
                 Target::AboveRoot => ("links.internal", String::new()),
+                // the base-path mistake is a root-relative `/x`; an absolute URL to the
+                // host or a `../` out of the base names another site on the same host
+                // (doc.rust-lang.org/book/ links ../std/), which may well exist
+                Target::OutsideBase(_) if !root_relative(&r.written) => continue,
                 Target::OutsideBase(p) => ("links.outside_base", p),
                 Target::Site(p) => {
                     if self.ignore.iter().any(|re| re.is_match(&p))
                         || self.files.file_for(&p).is_some()
+                        || self.files.redirected(&p)
                     {
                         continue;
                     }
@@ -200,6 +207,12 @@ pub(crate) fn resolve_from(
         Some(Some(d)) => Some(url::resolve(written, &page_dir, Some(&d), site)),
         _ => Some(url::resolve(written, &page_dir, None, site)),
     }
+}
+
+/// `/x`, not `//host/x` or a relative or absolute URL.
+fn root_relative(written: &str) -> bool {
+    let w = unescape_entities(written.trim());
+    w.starts_with('/') && !w.starts_with("//")
 }
 
 /// The broken references of every stylesheet under `dir`.
@@ -361,6 +374,7 @@ fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
         noindex: has_noindex(&markup),
         refresh,
         base_href,
+        alternates: tag_attrs(&markup, link_tag_re(), "rel", "alternate", "href"),
         canonicals,
         og_url: tag_attrs(&markup, meta_tag_re(), "property", "og:url", "content"),
         og_title: tag_attrs(&markup, meta_tag_re(), "property", "og:title", "content"),

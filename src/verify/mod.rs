@@ -123,8 +123,10 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
     }
     let all = scan::all_files(dir, opts.allow_project_root)?;
     let html = scan::html_files(&all);
-    let files = Files::new(all.iter().cloned(), opts.clean_urls);
     let given = opts.base_url.as_deref().and_then(Address::parse);
+    let redirects = std::fs::read_to_string(dir.join("_redirects")).unwrap_or_default();
+    let files = Files::new(all.iter().cloned(), opts.clean_urls)
+        .with_redirects(&redirects, given.as_ref().map_or("/", |a| a.base.as_str()));
     // the same glob rules as size budgets: `*` within a segment, `**` across them
     let ignore: Vec<regex::Regex> = opts
         .ignore
@@ -139,7 +141,7 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
     };
     let facts = scan::scan(dir, &html, &ctx(given.as_ref()))?;
     let css = scan::css_broken(dir, &all, &ctx(given.as_ref()))?;
-    let claimed = claimed_address(&facts, &files);
+    let claimed = claimed_address(&facts);
     let broken: Vec<&[Broken]> = facts.iter().map(|f| f.broken.as_slice()).collect();
     let mut run = judge(
         dir,
@@ -285,10 +287,32 @@ fn judge(
         run.warnings
             .push(json!({"layer": "output", "check": "verify.all_noindex", "pages": noindex}));
     }
-    let (e, w) = uniqueness(facts, &kinds, opts.unique);
+    // each page's hreflang versions, as files of the build
+    let versions: BTreeMap<&str, BTreeSet<String>> = facts
+        .iter()
+        .map(|f| {
+            let dir = url::page_dir(&f.rel, site);
+            let files_of = f
+                .alternates
+                .iter()
+                .filter_map(|a| match url::resolve(a, &dir, None, site) {
+                    Target::Site(p) => files.file_for(&p),
+                    _ => None,
+                })
+                .collect();
+            (f.rel.as_str(), files_of)
+        })
+        .collect();
+    let twins = |a: &str, b: &str| {
+        versions.get(a).is_some_and(|v| v.contains(b))
+            || versions.get(b).is_some_and(|v| v.contains(a))
+    };
+    let (e, w) = uniqueness(facts, &kinds, opts.unique, &twins);
     run.errors.extend(e);
     run.warnings.extend(w);
-    run.errors.extend(page_content(facts, &kinds));
+    let (e, w) = page_content(facts, &kinds);
+    run.errors.extend(e);
+    run.warnings.extend(w);
     run.errors
         .extend(shared_canonicals(facts, &kinds, site, files));
     run.errors
@@ -391,7 +415,21 @@ fn classify(
 /// `fr/404.html`, as Docusaurus and Hugo write them), Next.js's `_not-found`, and the
 /// root `200.html` single-page apps fall back to. `rel` is lower-cased.
 pub(crate) fn is_not_found_page(rel: &str) -> bool {
-    let name = |n: &str| rel == n || rel.ends_with(&format!("/{n}"));
+    // at the root, or under one locale folder (`fr/`, `pt-br/`): a `404/index.html` deep in
+    // the site is a page about 404s (gohugo.io's /templates/404/)
+    let locale = |seg: &str| {
+        let (lang, region) = seg.split_once('-').unwrap_or((seg, ""));
+        (2..=3).contains(&lang.len())
+            && lang.bytes().all(|b| b.is_ascii_lowercase())
+            && region.bytes().all(|b| b.is_ascii_alphanumeric())
+    };
+    let name = |n: &str| {
+        rel == n
+            || rel
+                .strip_suffix(n)
+                .and_then(|p| p.strip_suffix('/'))
+                .is_some_and(|seg| !seg.contains('/') && locale(seg))
+    };
     name("404.html")
         || name("404/index.html")
         || name("_not-found.html")
@@ -424,47 +462,53 @@ fn canonical_elsewhere(f: &PageFacts, site: Option<&Address>, files: &Files) -> 
 /// The address the pages claim: the scheme and host most absolute canonicals use, and
 /// the base path they all share when the build has no folder by that name
 /// (`https://user.github.io/repo/`). A suggestion and a comparison, never an inference.
-fn claimed_address(facts: &[PageFacts], files: &Files) -> Option<Address> {
-    let mut votes: BTreeMap<String, Vec<&str>> = BTreeMap::new();
+fn claimed_address(facts: &[PageFacts]) -> Option<Address> {
+    // a page's canonical is its claimed address plus its own path: what is left in front
+    // is the base path, however many segments (`/repo/`, Read the Docs' `/en/stable/`)
+    let mut votes: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
+    let mut total = 0;
     for f in facts {
-        if let Some(c) = f.canonicals.first() {
-            let Some(at) = c.find("://") else { continue };
-            let rest = &c[at + 3..];
-            let host_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
-            let origin = format!(
-                "{}://{}",
-                c[..at].to_ascii_lowercase(),
-                rest[..host_end].to_ascii_lowercase()
-            );
-            votes.entry(origin).or_default().push(&rest[host_end..]);
+        let Some(c) = f.canonicals.first() else {
+            continue;
+        };
+        let Some(at) = c.find("://") else { continue };
+        total += 1;
+        let rest = &c[at + 3..];
+        let host_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+        let origin = format!(
+            "{}://{}",
+            c[..at].to_ascii_lowercase(),
+            rest[..host_end].to_ascii_lowercase()
+        );
+        let path = rest[host_end..].split(['?', '#']).next().unwrap_or("");
+        let path: Vec<String> = path
+            .split('/')
+            .map(crate::check::html::percent_decode)
+            .collect();
+        let path = path.join("/");
+        let path = if path.is_empty() {
+            "/".to_string()
+        } else {
+            path
+        };
+        let own = [false, true]
+            .iter()
+            .map(|&clean| url::site_path_of(&f.rel, clean))
+            .find(|own| path.ends_with(own.as_str()));
+        if let Some(own) = own {
+            let base = format!("{}/", path[..path.len() - own.len()].trim_end_matches('/'));
+            *votes.entry(origin).or_default().entry(base).or_default() += 1;
         }
     }
-    let total: usize = votes.values().map(Vec::len).sum();
-    let (origin, paths) = votes.into_iter().max_by_key(|(_, p)| p.len())?;
-    if paths.len() * 2 <= total || paths.len() < 2 {
+    let (origin, bases) = votes
+        .into_iter()
+        .max_by_key(|(_, b)| b.values().sum::<usize>())?;
+    let n: usize = bases.values().sum();
+    if n * 2 <= total || n < 2 {
         return None;
     }
-    // the first path segment every canonical shares, if the build has no such folder
-    let first_seg = |p: &str| {
-        p.trim_start_matches('/')
-            .split(['/', '?', '#'])
-            .next()
-            .unwrap_or("")
-            .to_string()
-    };
-    let seg = first_seg(paths[0]);
-    let shared = !seg.is_empty()
-        && paths.iter().all(|p| {
-            first_seg(p) == seg && p.trim_start_matches('/').len() > seg.len()
-                || p.trim_matches('/') == seg
-        })
-        && files.file_for(&format!("/{seg}/")).is_none();
-    let base = if shared {
-        format!("{origin}/{seg}/")
-    } else {
-        format!("{origin}/")
-    };
-    Address::parse(&base)
+    let (base, _) = bases.into_iter().max_by_key(|(_, n)| *n)?;
+    Address::parse(&format!("{origin}{base}"))
 }
 
 fn counts(kinds: &[Kind]) -> Value {
@@ -633,7 +677,12 @@ fn is_pager(segs: &[&str], number: impl Fn(&str) -> bool) -> bool {
 /// With --unique they are errors, except where a list page (a pager, a taxonomy page) is
 /// involved. A duplicate names the first holder of the same value, among non-list pages
 /// first, so a list page can't hide a real pair.
-fn uniqueness(facts: &[PageFacts], kinds: &[Kind], unique: bool) -> (Vec<Value>, Vec<Value>) {
+fn uniqueness(
+    facts: &[PageFacts],
+    kinds: &[Kind],
+    unique: bool,
+    twins: &dyn Fn(&str, &str) -> bool,
+) -> (Vec<Value>, Vec<Value>) {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
     for (field, check) in [
@@ -658,7 +707,9 @@ fn uniqueness(facts: &[PageFacts], kinds: &[Kind], unique: bool) -> (Vec<Value>,
                 .copied()
                 .map(|o| (o, false))
                 .or_else(|| first_list.get(&value).copied().map(|o| (o, true)));
-            if let Some((other, other_list)) = other {
+            // an untranslated locale version keeps its original's title: the two name each
+            // other as hreflang alternates, and search engines show one per language
+            if let Some((other, other_list)) = other.filter(|(o, _)| !twins(&f.rel, o)) {
                 let e = json!({"layer": "output", "check": check, "page": f.rel, field: value, "duplicate_of": other});
                 if unique && !list && !other_list {
                     errors.push(e);
@@ -721,8 +772,13 @@ fn group_duplicates(found: Vec<Value>) -> Vec<Value> {
 
 /// What each document must carry whatever the site's address: one title, text escaped
 /// once, JSON-LD that parses, no second canonical or og tag.
-fn page_content(facts: &[PageFacts], kinds: &[Kind]) -> Vec<Value> {
+fn page_content(facts: &[PageFacts], kinds: &[Kind]) -> (Vec<Value>, Vec<Value>) {
+    static TWICE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let twice = TWICE.get_or_init(|| {
+        regex::Regex::new(r"&(?:amp|lt|gt|quot|apos|nbsp|#[0-9]+|#[xX][0-9a-fA-F]+);").unwrap()
+    });
     let mut errors = Vec::new();
+    let mut warnings = Vec::new();
     for (f, k) in facts.iter().zip(kinds) {
         // a not-found page is held to its links only (§4): hosts serve it as an error,
         // and generators write it in ways that are no one's to fix (Next.js gives it two
@@ -743,8 +799,25 @@ fn page_content(facts: &[PageFacts], kinds: &[Kind]) -> Vec<Value> {
         if f.title_count > 1 {
             errors.push(json!({"layer": "output", "check": "titles.multiple", "page": f.rel, "count": f.title_count}));
         }
-        if let Some((found, context, count)) = &f.double_escaped {
+        // escaped twice in the title or description: every search result shows `&amp;`.
+        // In the body it may be prose about entities ("write `&amp;nbsp;`"), which text
+        // alone can't tell from the bug: a warning there
+        let in_meta = [
+            ("title", Some(&f.title)),
+            ("description", f.description.as_ref()),
+        ]
+        .into_iter()
+        .find_map(|(field, v)| {
+            v.and_then(|v| twice.find(v))
+                .map(|m| (field, m.as_str().to_string()))
+        });
+        if let Some((field, found)) = in_meta {
             errors.push(
+                json!({"layer": "output", "check": "html.double_escaped", "page": f.rel,
+                               "in": field, "found": found}),
+            );
+        } else if let Some((found, context, count)) = &f.double_escaped {
+            warnings.push(
                 json!({"layer": "output", "check": "html.double_escaped", "page": f.rel,
                                "found": found, "context": context, "count": count}),
             );
@@ -765,7 +838,7 @@ fn page_content(facts: &[PageFacts], kinds: &[Kind]) -> Vec<Value> {
             }
         }
     }
-    errors
+    (errors, warnings)
 }
 
 /// A redirect's target (§5), with or without --base-url: a meta refresh, or a canonical
@@ -795,7 +868,7 @@ fn redirects(
         };
         if let Some(Target::Site(p)) = scan::resolve_from(t, &f.rel, base, site) {
             match files.file_for(&p) {
-                None if !ignored(&p) => errors.push(
+                None if !ignored(&p) && !files.redirected(&p) => errors.push(
                     json!({"layer": "output", "check": "redirect.target_missing", "page": f.rel, "target": t, "_path": p}),
                 ),
                 Some(file)

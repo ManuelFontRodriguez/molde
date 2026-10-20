@@ -176,6 +176,8 @@ pub(crate) fn resolve(
 pub(crate) struct Files {
     files: BTreeSet<String>,
     clean_urls: bool,
+    /// Site paths the host redirects (`_redirects`), without a trailing slash.
+    redirects: BTreeSet<String>,
 }
 
 impl Files {
@@ -183,7 +185,38 @@ impl Files {
         Self {
             files: files.into_iter().collect(),
             clean_urls,
+            redirects: BTreeSet::new(),
         }
+    }
+
+    /// The host's redirect rules, from a Netlify / Cloudflare Pages `_redirects` file in
+    /// the build: each `from to [status]` line with an exact `from` (no `*` splat or
+    /// `:placeholder`) and a status that serves something (not 404 or 410). `base` is
+    /// the site's base path, stripped from each `from`.
+    pub(crate) fn with_redirects(mut self, text: &str, base: &str) -> Self {
+        let base = base.trim_end_matches('/');
+        for line in text.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            let [from, _to, rest @ ..] = parts.as_slice() else {
+                continue;
+            };
+            if from.starts_with('#') || from.contains(['*', ':']) || !from.starts_with('/') {
+                continue;
+            }
+            let status = rest.first().map_or("301", |s| s.trim_end_matches('!'));
+            if matches!(status, "404" | "410") {
+                continue;
+            }
+            let path = from.strip_prefix(base).unwrap_or(from);
+            self.redirects
+                .insert(path.trim_end_matches('/').to_string());
+        }
+        self
+    }
+
+    /// Does the host redirect this site path (`/a` and `/a/` alike)?
+    pub(crate) fn redirected(&self, site_path: &str) -> bool {
+        !self.redirects.is_empty() && self.redirects.contains(site_path.trim_end_matches('/'))
     }
 
     /// The file a site path names, as the host serves it: the file itself, a folder's

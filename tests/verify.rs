@@ -197,7 +197,8 @@ fn each_check_catches_its_own_defect_in_a_real_build() {
         ),
         (
             "escaped",
-            Box::new(|d| edit(d, POST, "</body>", "<p>AT&amp;amp;T</p></body>")),
+            // in the title, an error (in the body it is a warning: see real_site_cases)
+            Box::new(|d| edit(d, POST, "<title>", "<title>AT&amp;amp;T ")),
             &[("html.double_escaped", 1)],
         ),
         (
@@ -1020,6 +1021,159 @@ fn the_walk_visits_each_real_folder_once() {
         map(&[("links.internal", 1)]),
         "{:#}",
         r["errors"]
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// What verify got wrong on nine real sites (gohugo.io, the Rust books, Flask's docs,
+/// Starlight's, 11ty.dev, docusaurus.io…), each planted in a copy of a real build.
+#[test]
+fn real_site_cases() {
+    let o = || opts(BASE);
+    let put = |d: &Path, rel: &str, html: &str| {
+        let p = d.join(rel);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, html).unwrap();
+    };
+    let cases: Vec<Case> = vec![
+        // a page about 404 templates deep in the site is a page (gohugo.io /templates/404/)
+        (
+            "deep-404-page",
+            Box::new(move |d| {
+                put(d, "templates/404/index.html", "<!doctype html><html><head><title>404 templates</title></head><body>x</body></html>");
+                edit(
+                    d,
+                    "sitemap.xml",
+                    "</urlset>",
+                    "<url><loc>https://example.org/templates/404/</loc></url></urlset>",
+                );
+            }),
+            o(),
+            &[],
+        ),
+        // ...while a locale's own 404 page is one
+        (
+            "locale-404",
+            Box::new(move |d| {
+                put(
+                    d,
+                    "pt-br/404.html",
+                    "<!doctype html><html><head></head><body>x</body></html>",
+                )
+            }),
+            o(),
+            &[],
+        ),
+        // untranslated hreflang twins keep the original's title (Starlight: 578 warnings)
+        (
+            "hreflang-twins",
+            Box::new(move |d| {
+                let twin = |me: &str, other: &str| {
+                    format!("<!doctype html><html><head><title>Same</title>\
+                    <link rel=\"canonical\" href=\"https://example.org{me}\">\
+                    <link rel=\"alternate\" hreflang=\"x\" href=\"https://example.org{other}\"></head><body>x</body></html>")
+                };
+                put(d, "en/a/index.html", &twin("/en/a/", "/de/a/"));
+                put(d, "de/a/index.html", &twin("/de/a/", "/en/a/"));
+            }),
+            molde::VerifyOptions {
+                unique: true,
+                ..o()
+            },
+            // the fixture's own pair (home and the posts list), not the twins
+            &[("titles.duplicate", 1)],
+        ),
+        // prose about entities in the body is a warning; escaped twice in the title, an error
+        (
+            "entity-prose",
+            Box::new(|d| {
+                edit(
+                    d,
+                    POST,
+                    "</body>",
+                    "<p>replace spaces with <code>x</code> &amp;nbsp; characters</p></body>",
+                )
+            }),
+            o(),
+            &[],
+        ),
+        (
+            "title-twice",
+            Box::new(|d| edit(d, POST, "<title>", "<title>AT&amp;amp;T ")),
+            o(),
+            &[("html.double_escaped", 1)],
+        ),
+        // the host's _redirects serve a moved page (gohugo.io, docusaurus.io); splats and
+        // 404 rules don't count
+        (
+            "redirects-file",
+            Box::new(|d| {
+                fs::write(
+                    d.join("_redirects"),
+                    "# moved\n/old/ /posts/ 301\n/older /posts/\n/gone/* /x/ 301\n/dead/ /x/ 404\n",
+                )
+                .unwrap();
+                edit(d, POST, "</body>", "<a href=\"/old/\">a</a><a href=\"/older/\">b</a><a href=\"/gone/x/\">c</a><a href=\"/dead/\">d</a></body>");
+            }),
+            o(),
+            &[("links.internal", 2)],
+        ),
+    ];
+    for (tag, plant, opts, want) in cases {
+        assert_eq!(planted(tag, plant, opts), map(want), "{tag}");
+    }
+    // the prose is still said, as a warning
+    let dir = copy("hugo-realistic", "entity-warning");
+    edit(&dir, POST, "</body>", "<p>use &amp;nbsp;</p></body>");
+    let r = molde::run_verify(&dir, &opts(BASE)).unwrap();
+    assert_eq!(
+        ids(&r, "warnings").get("html.double_escaped"),
+        Some(&1),
+        "{r:#}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// A site under a base path links its sibling sites on the same host (doc.rust-lang.org's
+/// book links ../std/): that is not the base-path mistake, which is a root-relative `/x`.
+#[test]
+fn sibling_sites_on_the_same_host_are_not_outside_the_base() {
+    let dir = copy("hugo-realistic-basepath", "siblings");
+    edit(&dir, "posts/post-05/index.html", "</body>",
+        "<a href=\"../../../other-repo/\">s</a><a href=\"https://user.github.io/other-repo/x/\">a</a></body>");
+    let r = molde::run_verify(&dir, &opts("https://user.github.io/repo/")).unwrap();
+    assert_eq!(
+        errors(&r),
+        map(&[("links.outside_base", 1)]),
+        "{:#}",
+        r["errors"]
+    );
+    assert_eq!(r["errors"][0]["broken_href"], "/posts/my-first-post/");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// A base path of more than one segment (Read the Docs' /en/stable/) is found from the
+/// canonicals, so a wrong --base-url is one error naming it.
+#[test]
+fn a_deep_base_path_is_found() {
+    let dir = std::env::temp_dir().join(format!("molde-verify-deepbase-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    for p in ["", "a/", "b/", "c/"] {
+        fs::create_dir_all(dir.join(p)).unwrap();
+        fs::write(dir.join(format!("{p}index.html")), format!("<!doctype html><html><head><title>t{p}</title>\
+            <link rel=\"canonical\" href=\"https://x.example/en/stable/{p}\"></head><body>x</body></html>")).unwrap();
+    }
+    let r = molde::run_verify(&dir, &opts("https://x.example/")).unwrap();
+    assert_eq!(
+        errors(&r),
+        map(&[("verify.base_url_mismatch", 1)]),
+        "{:#}",
+        r["errors"]
+    );
+    assert_eq!(r["errors"][0]["found"], "https://x.example/en/stable/");
+    assert_eq!(
+        errors(&molde::run_verify(&dir, &opts("https://x.example/en/stable/")).unwrap()),
+        map(&[])
     );
     let _ = fs::remove_dir_all(&dir);
 }

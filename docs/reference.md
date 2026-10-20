@@ -792,7 +792,7 @@ and each check judges it by that:
 | Kind | Recognised by | Held to |
 |---|---|---|
 | `not_document` | no `<html`, `<head` or doctype in its first 2 KB, after a byte-order mark and leading comments (a verification file, a fragment) | nothing |
-| `not_found` | `404.html`, `404/index.html`, `_not-found.html`, `_not-found/index.html` at any depth (a locale's own `fr/404.html`); the root `200.html` and `__spa-fallback.html`; the `--spa-fallback` file unless it is the root `index.html` | its links only, `rel=alternate` links aside (no one reads a 404's head) |
+| `not_found` | `404.html`, `404/index.html`, `_not-found.html`, `_not-found/index.html` at the root or under one locale folder (`fr/404.html`, `pt-br/404.html`; a `404/index.html` deeper in the site is a page about 404s); the root `200.html` and `__spa-fallback.html`; the `--spa-fallback` file unless it is the root `index.html` | its links only, `rel=alternate` links aside (no one reads a 404's head) |
 | `redirect` | a meta refresh with a URL to another page (read as the HTML spec reads `content`: `0;url=…`, `0, URL = '…'`, `0;…`; resolved from the page's `<base>`; a refresh to the page itself is a reload, not a redirect; one inside `<noscript>` counts only when the page has no title and no text besides it), or a canonical to another page of the build (an alias, a pager; an absolute canonical counts only with `--base-url`) | a refresh stub: its links and its target. A page with a canonical elsewhere: also one title, escaping, JSON-LD; and many unrelated pages naming one page is `canonical.shared` |
 | `noindex` | a robots noindex meta | links and `titles.multiple` (a title isn't required on any noindex page: a frame's content, mdBook's `toc.html`, a print view); kept out of the sitemap and of uniqueness. A site whose every document is noindex gets the warning `verify.all_noindex` |
 | `indexable` | everything else | every check |
@@ -805,11 +805,11 @@ The report's `pages` counts each kind.
 | check | when | fires when |
 |---|---|---|
 | `links.internal` | always | a link or asset (`href`, `src`, `srcset`, CSS `url()` and `@import`, read inside tags as `check` reads them; `<base>` and canonical hrefs are not links) names no file of the build. The same missing page linked from three or more pages is one error, with `target`, `count` and `pages` |
-| `links.outside_base` | with a base path | a link leaves the base path (`/posts/x/` on a site at `/repo/`): it works on disk and 404s in production |
+| `links.outside_base` | with a base path | a root-relative link skips the base path (`/posts/x/` on a site at `/repo/`): it works on disk and 404s in production. A link written absolute to the host, or climbing out with `../`, names another site on the same host (`doc.rust-lang.org/book/` linking `../std/`) and is not judged |
 | `links.clean_urls` | without `--clean-urls` | three or more missing pages (links, canonicals, redirects and sitemap entries), and more than half of all missing pages, would resolve as `a.html`: one error for all of them (`count`, `by_check`, `examples`) saying to try `--clean-urls`. Fewer stay `links.internal` |
 | `titles.missing`, `titles.multiple` | documents | as in `check` |
-| `titles.duplicate`, `description.duplicate` | indexable documents | warnings; errors with `--unique`. A value more than 10 pages share with the same first holder (a theme's default description) is one entry, with `count` and five `examples` |
-| `html.double_escaped`, `jsonld.invalid` | documents | as in `check` |
+| `titles.duplicate`, `description.duplicate` | indexable documents | warnings; errors with `--unique`. A value more than 10 pages share with the same first holder (a theme's default description) is one entry, with `count` and five `examples`. Two pages that name each other as `rel=alternate` (an untranslated locale version keeping its original's title) are not duplicates |
+| `html.double_escaped`, `jsonld.invalid` | documents | as in `check`, except that text escaped twice only in the body is a warning (it may be prose about entities, "write `&amp;nbsp;`"); in the title or meta description it is an error (`in`) |
 | `canonical.duplicate`, `og.duplicate` | documents | as in `check` |
 | `canonical.off_host` | with `--base-url` | the canonical is on another host, or outside the base path |
 | `canonical.target_missing` | with `--base-url` | the canonical names a page this build doesn't have |
@@ -823,7 +823,7 @@ The report's `pages` counts each kind.
 | `sitemap.not_found` | with `--base-url` | a warning: no sitemap found |
 | `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a `robots.txt` | robots.txt names a sitemap on this site that the build doesn't have (an error; one on another host isn't judged), or has no `Sitemap:` line while the build has a sitemap (a warning: valid, and Hugo's default) / shuts every crawler out of a site with pages to index |
 | `og.missing`, `og.title_mismatch` | with `--og` | |
-| `verify.base_url_mismatch` | with `--base-url`, or without it when the pages claim a base path | the pages claim another address (their canonicals' host and base path), and it explains most of the errors: one error naming it (`found`; `given` is null without `--base-url`), plus the errors and warnings that remain under both addresses |
+| `verify.base_url_mismatch` | with `--base-url`, or without it when the pages claim a base path | the pages claim another address (their canonicals' host, and the base path in front of each page's own path, however many segments: `/en/stable/`), and it explains most of the errors: one error naming it (`found`; `given` is null without `--base-url`), plus the errors and warnings that remain under both addresses |
 | `verify.no_pages` | always | the folder has no HTML documents (an empty build), or doesn't exist (`message: "not a folder"`, `build: null`) |
 | `verify.all_noindex` | always | a warning: every document asks not to be indexed (`pages`), usually a staging setting that shipped |
 | `verify.project_root` | always | the folder is a project (it holds `package.json`, `hugo.toml`, …), not its output: the message names the output folder |
@@ -848,7 +848,9 @@ S3 REST origin returns 403 for `/a`, and serves `/a/` only with a rewrite), `/a`
 reach (another host, or an absolute base without `--base-url`), where they are not
 judged; the first `<base>` with an `href` counts, as in browsers, and a base that is only
 a `#fragment` or `?query` moves nothing. The base path is compared decoded
-(`/caf%C3%A9/` is `/café/`). A symlink inside the build is served as the file it names;
+(`/caf%C3%A9/` is `/café/`). A `_redirects` file in the build (Netlify, Cloudflare Pages) is read: a link or
+redirect to a path it moves (an exact `from`, not a splat or `:placeholder`, and not a
+404/410 rule) is not missing. `vercel.json` and server configuration are not read. A symlink inside the build is served as the file it names;
 one that leaves the build is not part of it. Each real folder is read once however many links reach it; `.git` is never
 part of the build, nor, with `--allow-project-root`, `node_modules`. `<base>` is the
 element itself, not a custom element named `base-…`.
