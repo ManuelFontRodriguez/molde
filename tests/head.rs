@@ -478,3 +478,41 @@ fn titles_are_compared_as_a_browser_shows_them() {
     assert_eq!(errors[0]["expected"], "Dividend — stocks");
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn canonical_and_og_url_are_compared_as_urls() {
+    // the home page's own URL written without its slash and with the host in capitals:
+    // the same page, so no mismatch; a path in another case is another page
+    let head = |url: &str| {
+        format!(
+            "<html><head><title>Home</title>\
+             <link rel=\"canonical\" href=\"{url}\">\
+             <meta property=\"og:url\" content=\"{url}\">\
+             <meta property=\"og:title\" content=\"Home\">\
+             <meta property=\"og:type\" content=\"website\"></head><body>x</body></html>"
+        )
+    };
+    for url in [
+        "https://x.example",
+        "HTTPS://X.Example/",
+        "https://x.example/",
+        "https://x.example:443/",
+    ] {
+        let dir = site("same-url", ONE_PAGE, &[("p.j2", &head(url))]);
+        let errors = head_errors(&dir);
+        assert!(errors.is_empty(), "{url}: {errors:?}");
+        let _ = fs::remove_dir_all(&dir);
+    }
+    let dir = site(
+        "other-url",
+        "routes:\n  - path: /a/index.html\n    template: p.j2\n    title: A\n",
+        &[("p.j2", &head("https://x.example/A/").replace("Home", "A"))],
+    );
+    let errors = head_errors(&dir);
+    assert_eq!(
+        ids(&errors),
+        ["canonical.mismatch", "og.mismatch"],
+        "{errors:?}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
