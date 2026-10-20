@@ -29,9 +29,11 @@ pub fn check_head(build_dir: &Path, site: &Site, pages: &[Page]) -> Result<Vec<s
     let Some(base) = &site.config.base_url else {
         return Ok(Vec::new());
     };
+    // normalised once, so each page's canonical is one set lookup (43k pages × 43k locs
+    // compared one by one is minutes)
     let sitemap_locs: BTreeSet<String> =
         sitemap_page_locs(build_dir, Some(base.trim_end_matches('/')))?
-            .map(|(locs, _)| locs.into_iter().collect())
+            .map(|(locs, _)| locs.iter().map(|l| normal_url(l)).collect())
             .unwrap_or_default();
 
     // per page, on every core: everything but description.duplicate, which needs the
@@ -211,21 +213,45 @@ fn canonical_error(
             "page": rel,
             "expected": expected,
         })),
-        Some(href) if href != expected => Some(serde_json::json!({
+        Some(href) if !same_url(&href, expected) => Some(serde_json::json!({
             "layer": "output",
             "check": "canonical.mismatch",
             "page": rel,
             "found": href,
             "expected": expected,
         })),
-        Some(href) if page.index && !sitemap_locs.contains(&href) => Some(serde_json::json!({
-            "layer": "output",
-            "check": "canonical.not_in_sitemap",
-            "page": rel,
-            "url": href,
-        })),
+        Some(href) if page.index && !sitemap_locs.contains(&normal_url(&href)) => {
+            Some(serde_json::json!({
+                "layer": "output",
+                "check": "canonical.not_in_sitemap",
+                "page": rel,
+                "url": href,
+            }))
+        }
         Some(_) => None,
     }
+}
+
+/// The same page's URL, as a browser compares them: the scheme and host in any case, a
+/// default port (`:443` for https, `:80` for http) the same as none, an empty path the
+/// same as `/`; the path itself exactly (servers tell `/A` from `/a`).
+fn same_url(a: &str, b: &str) -> bool {
+    normal_url(a) == normal_url(b)
+}
+
+/// The form `same_url` compares: `HTTPS://Example.com:443` is `https://example.com/`.
+pub(crate) fn normal_url(u: &str) -> String {
+    let u = u.trim();
+    let host_at = u.find("://").map_or(0, |i| i + 3);
+    let path_at = u[host_at..].find('/').map_or(u.len(), |i| host_at + i);
+    let mut origin = u[..path_at].to_ascii_lowercase();
+    for (scheme, port) in [("https://", ":443"), ("http://", ":80")] {
+        if origin.starts_with(scheme) && origin.ends_with(port) {
+            origin.truncate(origin.len() - port.len());
+        }
+    }
+    let path = &u[path_at..];
+    format!("{origin}{}", if path.is_empty() { "/" } else { path })
 }
 
 /// One `og.missing` per required Open Graph property the page lacks.
@@ -253,7 +279,7 @@ fn og_url_mismatch(html: &str, rel: &str, expected: &str) -> Option<serde_json::
     let Some(Some(og_url)) = tag_attr(html, meta_tag_re(), "property", "og:url", "content") else {
         return None;
     };
-    (og_url != expected).then(|| {
+    (!same_url(&og_url, expected)).then(|| {
         serde_json::json!({
             "layer": "output",
             "check": "og.mismatch",

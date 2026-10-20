@@ -16,6 +16,11 @@ of release may change is in the reference's
 - A robots noindex inside a comment, a script, a style or a `<template>` is not the
   page's: `sitemap.noindex_listed` fired on a listed page whose noindex was commented
   out, and `titles.duplicate` would have skipped it. Crawlers index such a page.
+- `canonical.mismatch`, `og.mismatch` and `canonical.not_in_sitemap` compare URLs as a
+  browser does: the scheme and host in any case, and an empty path the same as `/`
+  (`https://Example.com` and `https://example.com:443` are `https://example.com/`). A hand-written canonical that named
+  the right page in another spelling used to fail; it passes. The path is still compared
+  exactly. `std_head` always wrote the normal form, so molde's own pages are unaffected.
 
 ## 0.1.0 — 2026-10-19
 
