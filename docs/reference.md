@@ -733,8 +733,11 @@ none), on any element, including attributes that end in them (`data-src`, `xlink
 `base_url` set, written absolute to the site's own address (`https://example.com/x/`,
 `http://` or `//example.com/x/` too: the host in any case, the path under `base_url`'s);
 every `srcset` candidate; and `url()` and `@import` in `.css` files (resolved from the
-stylesheet's folder), in `<style>` blocks and in `style` attributes. Entities and
-`%`-escapes are decoded first. What the checks do not see:
+stylesheet's folder), in `<style>` blocks and in `style` attributes. Attributes are read
+inside tags (and quoted URLs inside `<script>`), never in text or inside another
+attribute's value: an escaped code sample (`&lt;a href=&quot;/x&quot;&gt;` in a `<pre>`,
+or in a `data-code="…"`) is not a link, while a real link inside `<code>` is. A framework
+binding (`:href`, `x-bind:href`, `v-bind:src`) holds code, not a URL, and is not read. Entities and `%`-escapes are decoded first. What the checks do not see:
 
 - **`<base href>`.** Relative links are always resolved from the page's own folder; a
   `<base>` element is ignored.

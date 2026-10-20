@@ -56,6 +56,12 @@ of release may change is in the reference's
 - A reader that stops early (`molde check --site site | head`) no longer makes molde
   panic with "failed printing to stdout: Broken pipe"; the exit code is the command's
   own. Nothing to do.
+- `links.internal` read `href=` and `src=` in page text too, so a docs page showing HTML
+  in a code block (`&lt;link href=&quot;/favicon.ico&quot;&gt;`) failed on a link that
+  isn't one. Attributes are now read inside tags only, plus quoted URLs inside
+  `<script>` as before; a real link inside `<code>` still counts. `href=` text inside
+  another attribute's value, and framework bindings (`:href`, `x-bind:href`), are not
+  links either (gohugo.io's 788 and Starlight's 246 false errors). Nothing to do.
 
 ## 0.1.0 — 2026-10-19
 
