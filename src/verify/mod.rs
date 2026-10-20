@@ -8,7 +8,7 @@ mod url;
 use crate::check::head::shown_text;
 use crate::check::robots;
 use anyhow::Result;
-use scan::PageFacts;
+use scan::{Broken, LinkCtx, PageFacts};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -86,11 +86,34 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
     }
     let all = scan::all_files(dir)?;
     let html = scan::html_files(dir)?;
-    let facts = scan::scan(dir, &html)?;
     let files = Files::new(all.iter().cloned(), opts.clean_urls);
     let given = opts.base_url.as_deref().and_then(Address::parse);
+    // the same glob rules as size budgets: `*` within a segment, `**` across them
+    let ignore: Vec<regex::Regex> = opts
+        .ignore
+        .iter()
+        .map(|p| crate::check::budgets::glob_regex(p))
+        .collect();
+    let ctx = |site| LinkCtx {
+        site,
+        files: &files,
+        ignore: &ignore,
+        spa_fallback: opts.spa_fallback.is_some(),
+    };
+    let facts = scan::scan(dir, &html, &ctx(given.as_ref()))?;
+    let css = scan::css_broken(dir, &all, &ctx(given.as_ref()))?;
     let claimed = claimed_address(&facts, &files);
-    let run = judge(dir, &facts, &all, &files, given.as_ref(), opts)?;
+    let broken: Vec<&[Broken]> = facts.iter().map(|f| f.broken.as_slice()).collect();
+    let run = judge(
+        dir,
+        &facts,
+        &broken,
+        &css,
+        &files,
+        given.as_ref(),
+        opts,
+        &ignore,
+    )?;
     if run.documents == 0 {
         let e = json!({"layer": "output", "check": "verify.no_pages", "dir": dir.display().to_string()});
         return Ok(report(
@@ -108,7 +131,19 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
     // that remain under both addresses are real whichever is right, and stay.
     if let (Some(given), Some(claimed)) = (&given, &claimed) {
         if !url::same_url(&given.url_of("/"), &claimed.url_of("/")) && run.errors.len() >= 3 {
-            let other = judge(dir, &facts, &all, &files, Some(claimed), opts)?;
+            let html_b = scan::html_broken(dir, &html, &ctx(Some(claimed)))?;
+            let css_b = scan::css_broken(dir, &all, &ctx(Some(claimed)))?;
+            let broken_b: Vec<&[Broken]> = html_b.iter().map(Vec::as_slice).collect();
+            let other = judge(
+                dir,
+                &facts,
+                &broken_b,
+                &css_b,
+                &files,
+                Some(claimed),
+                opts,
+                &ignore,
+            )?;
             if other.errors.len() * 2 < run.errors.len() {
                 let key = |e: &Value| format!("{}|{}|{}", e["check"], e["page"], e["broken_href"]);
                 let in_both: BTreeSet<String> = other.errors.iter().map(key).collect();
@@ -160,20 +195,17 @@ struct Run {
     skipped: Vec<Value>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn judge(
     dir: &Path,
     facts: &[PageFacts],
-    all: &[String],
+    broken: &[&[Broken]],
+    css: &[(String, Vec<Broken>)],
     files: &Files,
     site: Option<&Address>,
     opts: &VerifyOptions,
+    ignore: &[regex::Regex],
 ) -> Result<Run> {
-    // the same glob rules as size budgets: `*` within a segment, `**` across them
-    let ignore: Vec<regex::Regex> = opts
-        .ignore
-        .iter()
-        .map(|p| crate::check::budgets::glob_regex(p))
-        .collect();
     let ignored = |site_path: &str| ignore.iter().any(|re| re.is_match(site_path));
     let kinds = classify(facts, site, files);
     let kind_of: BTreeMap<&str, Kind> = facts
@@ -188,8 +220,7 @@ fn judge(
         warnings: Vec::new(),
         skipped: Vec::new(),
     };
-    run.errors
-        .extend(links(dir, facts, all, site, files, opts, &ignored)?);
+    run.errors.extend(links(facts, broken, css, files, opts));
     let (e, w) = uniqueness(facts, &kinds, opts.unique);
     run.errors.extend(e);
     run.warnings.extend(w);
@@ -346,87 +377,30 @@ fn counts(kinds: &[Kind]) -> Value {
     json!(c)
 }
 
-/// links.internal, links.outside_base, and the grouped causes (§6).
+/// links.internal and links.outside_base, from the broken links the scan found, and the
+/// grouped causes (§6). `html` is each page's broken links, in `facts` order.
 fn links(
-    dir: &Path,
     facts: &[PageFacts],
-    all: &[String],
-    site: Option<&Address>,
+    html: &[&[Broken]],
+    css: &[(String, Vec<Broken>)],
     files: &Files,
     opts: &VerifyOptions,
-    ignored: &dyn Fn(&str) -> bool,
-) -> Result<Vec<Value>> {
-    let mut sources: Vec<(String, String, Option<String>, Vec<scan_ref::OwnedRef>)> = facts
-        .iter()
-        .map(|f| {
-            let page_dir = url::page_dir(&f.rel, site);
-            let base_dir =
-                f.base_href
-                    .as_deref()
-                    .and_then(|b| match url::resolve(b, &page_dir, None, site) {
-                        Target::Site(p) => {
-                            let base = site.map_or("/", |s| s.base.as_str()).trim_end_matches('/');
-                            let mut d = format!("{base}{p}");
-                            if !d.ends_with('/') {
-                                d = d
-                                    .rsplit_once('/')
-                                    .map_or("/".into(), |(a, _)| format!("{a}/"));
-                            }
-                            Some(d)
-                        }
-                        _ => None,
-                    });
-            // a canonical's href is the canonical checks' to judge, precisely: not a link too
-            let refs = f.refs.iter().filter(|r| {
-                !(r.attribute.eq_ignore_ascii_case("href") && f.canonicals.contains(&r.written))
-            });
-            (
-                f.rel.clone(),
-                page_dir,
-                base_dir,
-                refs.map(|r| scan_ref::OwnedRef {
-                    attribute: r.attribute.clone(),
-                    written: r.written.clone(),
-                })
-                .collect(),
-            )
-        })
-        .collect();
-    for (rel, refs) in scan::css_refs_of(dir, all)? {
-        let page_dir = url::page_dir(&rel, site);
-        sources.push((rel, page_dir, None, scan_ref::own(&refs)));
-    }
+) -> Vec<Value> {
     let mut internal = Vec::new();
     let mut outside = Vec::new();
-    for (rel, page_dir, base_dir, refs) in &sources {
-        let mut seen = BTreeSet::new();
-        for r in refs {
-            let target = url::resolve(&r.written, page_dir, base_dir.as_deref(), site);
-            let (check, path) = match &target {
-                Target::Elsewhere => continue,
-                Target::AboveRoot => ("links.internal", String::new()),
-                Target::OutsideBase(p) => ("links.outside_base", p.clone()),
-                Target::Site(p) => {
-                    if ignored(p) || files.file_for(p).is_some() {
-                        continue;
-                    }
-                    let spa = opts.spa_fallback.is_some()
-                        && !p.rsplit('/').next().unwrap_or("").contains('.');
-                    if spa {
-                        continue;
-                    }
-                    ("links.internal", p.clone())
-                }
-            };
-            if !seen.insert((r.attribute.clone(), r.written.clone())) {
-                continue;
-            }
-            let e = json!({"layer": "output", "check": check, "page": rel, "attribute": r.attribute,
-                           "broken_href": r.written});
-            if check == "links.internal" {
-                internal.push((e, path));
+    let pages = facts
+        .iter()
+        .map(|f| f.rel.as_str())
+        .zip(html.iter().copied());
+    let sheets = css.iter().map(|(rel, b)| (rel.as_str(), b.as_slice()));
+    for (rel, broken) in pages.chain(sheets) {
+        for b in broken {
+            let e = json!({"layer": "output", "check": b.check, "page": rel, "attribute": b.attribute,
+                           "broken_href": b.written});
+            if b.check == "links.internal" {
+                internal.push((e, b.path.clone()));
             } else {
-                outside.push((e, path));
+                outside.push((e, b.path.clone()));
             }
         }
     }
@@ -452,7 +426,7 @@ fn links(
     }
     errors.extend(group_by_target(internal));
     errors.extend(group_by_target(outside));
-    Ok(errors)
+    errors
 }
 
 /// One cause, one error (§6): links to the same missing page, however each was written,
@@ -487,22 +461,6 @@ fn group_by_target(errors: Vec<(Value, String)>) -> Vec<Value> {
         out.push(first);
     }
     out
-}
-
-/// `Ref`s outlive the scan's borrow: a small owned copy.
-mod scan_ref {
-    pub(super) struct OwnedRef {
-        pub(super) attribute: String,
-        pub(super) written: String,
-    }
-    pub(super) fn own(refs: &[crate::check::links::Ref]) -> Vec<OwnedRef> {
-        refs.iter()
-            .map(|r| OwnedRef {
-                attribute: r.attribute.clone(),
-                written: r.written.clone(),
-            })
-            .collect()
-    }
 }
 
 /// A page that lists other pages (a pager, a taxonomy page): it may share a title with

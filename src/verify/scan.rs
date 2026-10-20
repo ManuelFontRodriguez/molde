@@ -1,5 +1,6 @@
 //! One pass over the build: every HTML file is read once, and only the facts the checks
 //! need are kept (docs/design/verify.md §4). Checks then work from these facts.
+use super::url::{self, Address, Files, Target};
 use crate::build::par_map;
 use crate::check::head::{markup_only, tag_attr, tag_attrs};
 use crate::check::html::{
@@ -20,8 +21,6 @@ pub(crate) struct PageFacts {
     pub(crate) noindex: bool,
     /// The target of a `<meta http-equiv="refresh" content="0; url=…">`, as written.
     pub(crate) refresh: Option<String>,
-    /// `<base href>`, as written.
-    pub(crate) base_href: Option<String>,
     pub(crate) canonicals: Vec<String>,
     pub(crate) og_url: Vec<String>,
     pub(crate) og_title: Vec<String>,
@@ -30,7 +29,9 @@ pub(crate) struct PageFacts {
     /// The first `<title>`, entities decoded, trimmed; empty when there is none.
     pub(crate) title: String,
     pub(crate) description: Option<String>,
-    pub(crate) refs: Vec<Ref>,
+    /// The links and assets that resolve to no file, judged during the scan so that a
+    /// page's hundreds of good links are never kept (43k pages would hold gigabytes).
+    pub(crate) broken: Vec<Broken>,
     /// Text escaped twice: the first occurrence, its context and the count.
     pub(crate) double_escaped: Option<(String, String, usize)>,
     /// JSON-LD blocks that don't parse: (block number from 1, parser message).
@@ -62,26 +63,126 @@ pub(crate) fn all_files(dir: &Path) -> Result<Vec<String>> {
     Ok(files)
 }
 
-/// Every stylesheet under `dir`, with the URLs it references.
-pub(crate) fn css_refs_of(dir: &Path, files: &[String]) -> Result<Vec<(String, Vec<Ref>)>> {
+/// A link or asset that names no file of the build.
+pub(crate) struct Broken {
+    pub(crate) attribute: String,
+    pub(crate) written: String,
+    /// `links.internal` or `links.outside_base`.
+    pub(crate) check: &'static str,
+    /// The site path it names (empty when it climbs above the root).
+    pub(crate) path: String,
+}
+
+/// What a link is judged against: the site's address, the build's files, what to ignore.
+pub(crate) struct LinkCtx<'a> {
+    pub(crate) site: Option<&'a Address>,
+    pub(crate) files: &'a Files,
+    pub(crate) ignore: &'a [regex::Regex],
+    pub(crate) spa_fallback: bool,
+}
+
+impl LinkCtx<'_> {
+    /// The broken ones among a file's references, each written link once.
+    fn judge(
+        &self,
+        rel: &str,
+        base_href: Option<&str>,
+        canonicals: &[String],
+        refs: Vec<Ref>,
+    ) -> Vec<Broken> {
+        let page_dir = url::page_dir(rel, self.site);
+        // `<base href>` moves where relative links start from
+        let base_dir = base_href.and_then(|b| match url::resolve(b, &page_dir, None, self.site) {
+            Target::Site(p) => {
+                let base = self
+                    .site
+                    .map_or("/", |s| s.base.as_str())
+                    .trim_end_matches('/');
+                let d = format!("{base}{p}");
+                Some(if d.ends_with('/') {
+                    d
+                } else {
+                    d.rsplit_once('/')
+                        .map_or("/".into(), |(a, _)| format!("{a}/"))
+                })
+            }
+            _ => None,
+        });
+        let mut seen = std::collections::BTreeSet::new();
+        let mut broken = Vec::new();
+        for r in refs {
+            // a canonical's href is the canonical checks' to judge, precisely: not a link too
+            if r.attribute.eq_ignore_ascii_case("href") && canonicals.contains(&r.written) {
+                continue;
+            }
+            let (check, path) =
+                match url::resolve(&r.written, &page_dir, base_dir.as_deref(), self.site) {
+                    Target::Elsewhere => continue,
+                    Target::AboveRoot => ("links.internal", String::new()),
+                    Target::OutsideBase(p) => ("links.outside_base", p),
+                    Target::Site(p) => {
+                        if self.ignore.iter().any(|re| re.is_match(&p))
+                            || self.files.file_for(&p).is_some()
+                        {
+                            continue;
+                        }
+                        // the SPA fallback serves unknown pages, not missing files
+                        if self.spa_fallback && !p.rsplit('/').next().unwrap_or("").contains('.') {
+                            continue;
+                        }
+                        ("links.internal", p)
+                    }
+                };
+            if seen.insert((r.attribute.clone(), r.written.clone())) {
+                broken.push(Broken {
+                    attribute: r.attribute,
+                    written: r.written,
+                    check,
+                    path,
+                });
+            }
+        }
+        broken
+    }
+}
+
+/// The broken references of every stylesheet under `dir`.
+pub(crate) fn css_broken(
+    dir: &Path,
+    files: &[String],
+    ctx: &LinkCtx,
+) -> Result<Vec<(String, Vec<Broken>)>> {
     let sheets: Vec<&String> = files
         .iter()
         .filter(|f| f.to_ascii_lowercase().ends_with(".css"))
         .collect();
     par_map(sheets.len(), |i| {
         let css = String::from_utf8_lossy(&std::fs::read(dir.join(sheets[i]))?).into_owned();
-        Ok((sheets[i].clone(), css_refs(&css)))
+        Ok((
+            sheets[i].clone(),
+            ctx.judge(sheets[i], None, &[], css_refs(&css)),
+        ))
     })
 }
 
-pub(crate) fn scan(dir: &Path, files: &[String]) -> Result<Vec<PageFacts>> {
+/// The broken links of every HTML file judged against another address: the files are
+/// read again, which happens only when verify compares --base-url with the address the
+/// pages claim.
+pub(crate) fn html_broken(dir: &Path, files: &[String], ctx: &LinkCtx) -> Result<Vec<Vec<Broken>>> {
     par_map(files.len(), |i| {
         let raw = String::from_utf8_lossy(&std::fs::read(dir.join(&files[i]))?).into_owned();
-        Ok(facts(&files[i], &raw))
+        Ok(facts(&files[i], &raw, ctx).broken)
     })
 }
 
-fn facts(rel: &str, raw: &str) -> PageFacts {
+pub(crate) fn scan(dir: &Path, files: &[String], ctx: &LinkCtx) -> Result<Vec<PageFacts>> {
+    par_map(files.len(), |i| {
+        let raw = String::from_utf8_lossy(&std::fs::read(dir.join(&files[i]))?).into_owned();
+        Ok(facts(&files[i], &raw, ctx))
+    })
+}
+
+fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
     static RES: OnceLock<(
         regex::Regex,
         regex::Regex,
@@ -145,13 +246,14 @@ fn facts(rel: &str, raw: &str) -> PageFacts {
             jsonld_errors.push((n + 1, e.to_string()));
         }
     }
+    let canonicals = tag_attrs(&markup, link_tag_re(), "rel", "canonical", "href");
+    let broken = ctx.judge(rel, base_href.as_deref(), &canonicals, html_refs(raw));
     PageFacts {
         rel: rel.to_string(),
         is_document,
         noindex: has_noindex(&markup),
         refresh,
-        base_href,
-        canonicals: tag_attrs(&markup, link_tag_re(), "rel", "canonical", "href"),
+        canonicals,
         og_url: tag_attrs(&markup, meta_tag_re(), "property", "og:url", "content"),
         og_title: tag_attrs(&markup, meta_tag_re(), "property", "og:title", "content"),
         og_type: tag_attrs(&markup, meta_tag_re(), "property", "og:type", "content"),
@@ -161,7 +263,7 @@ fn facts(rel: &str, raw: &str) -> PageFacts {
             .flatten()
             .map(|d| d.trim().to_string())
             .filter(|d| !d.is_empty()),
-        refs: html_refs(raw),
+        broken,
         double_escaped: double_escaped(raw),
         jsonld_errors,
     }
