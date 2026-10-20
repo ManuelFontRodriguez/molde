@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// `serve --watch` options: rerun the verified check pipeline when the site
 /// changes; optionally auto-refresh open browser tabs when a new build publishes.
@@ -26,13 +28,12 @@ pub fn serve(root: &Path, port: u16, watch: Option<WatchOpts>) -> Result<()> {
     let listener = TcpListener::bind(("127.0.0.1", port))
         .with_context(|| format!("binding 127.0.0.1:{port}"))?;
     let reload = watch.as_ref().is_some_and(|w| w.reload);
+    // Some(running) under --watch: whether the startup check is still running
+    let first_check = watch.as_ref().map(|_| Arc::new(AtomicBool::new(true)));
     if let Some(w) = watch {
         // baseline BEFORE the initial check: an edit saved while that check runs
         // must register as a change on the first poll, not vanish into the baseline
         let baseline = site_fingerprint(&w.site, &w.out);
-        // one verified build up front: `serve --watch` from a fresh checkout
-        // must not serve 404s until the first manual check
-        log_check(&w);
         eprintln!(
             "molde serve: watching {} (verified check on change{})",
             w.site.display(),
@@ -42,7 +43,16 @@ pub fn serve(root: &Path, port: u16, watch: Option<WatchOpts>) -> Result<()> {
                 ""
             }
         );
-        std::thread::spawn(move || watch_loop(&w, baseline));
+        // one verified build up front, in the background: the last good build is
+        // served meanwhile, and a fresh checkout gets a "first build" page, not 404s
+        let running = first_check.clone();
+        std::thread::spawn(move || {
+            log_check(&w);
+            if let Some(r) = running {
+                r.store(false, Ordering::SeqCst);
+            }
+            watch_loop(&w, baseline)
+        });
     }
     eprintln!("molde serve: {} -> http://127.0.0.1:{port}", root.display());
     let root = root.to_path_buf();
@@ -56,7 +66,10 @@ pub fn serve(root: &Path, port: u16, watch: Option<WatchOpts>) -> Result<()> {
         else {
             return http::response(400, "text/plain; charset=utf-8", b"bad request");
         };
-        let mut resp = serve_response(&root, &path, reload);
+        let mut resp = match &first_check {
+            Some(running) => serve_watching(&root, &path, reload, running.load(Ordering::SeqCst)),
+            None => serve_response(&root, &path, reload),
+        };
         if req.method == "HEAD" {
             if let Some(end) = resp.windows(4).position(|w| w == b"\r\n\r\n") {
                 resp.truncate(end + 4);
@@ -81,6 +94,32 @@ pub fn serve_response(root: &Path, url_path: &str, reload: bool) -> Vec<u8> {
         inject_reload_snippet(&mut body, &current_build_id(root));
     }
     http_response(status, ctype, &body)
+}
+
+/// Under `serve --watch`: the published build as `serve_response` serves it, or, while
+/// there is none yet, a page that says why and reloads itself every second (status 503):
+/// the startup check is running, or it failed and the terminal says what to fix.
+pub fn serve_watching(
+    root: &Path,
+    url_path: &str,
+    reload: bool,
+    first_check_running: bool,
+) -> Vec<u8> {
+    if root.exists() {
+        return serve_response(root, url_path, reload);
+    }
+    let text = if first_check_running {
+        "First build in progress: molde is running the check. This page reloads when it publishes."
+    } else {
+        "No build yet: the first check did not pass. The terminal running molde serve says \
+         what to fix; this page reloads when a build publishes."
+    };
+    let body = format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\">\
+         <meta http-equiv=\"refresh\" content=\"1\"><title>molde serve</title></head>\
+         <body><p>{text}</p></body></html>"
+    );
+    http_response(503, "text/html; charset=utf-8", body.as_bytes())
 }
 
 fn respond(root: &Path, url_path: &str) -> (u16, &'static str, Vec<u8>) {
@@ -347,6 +386,7 @@ fn http_response(status: u16, ctype: &str, body: &[u8]) -> Vec<u8> {
     let reason = match status {
         200 => "OK",
         400 => "Bad Request",
+        503 => "Service Unavailable",
         _ => "Not Found",
     };
     let mut resp = format!(

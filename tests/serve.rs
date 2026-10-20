@@ -30,6 +30,34 @@ fn get(root: &Path, path: &str, reload: bool) -> (u16, Vec<u8>) {
     (status, raw[split + 4..].to_vec())
 }
 
+/// `serve --watch` answers at once (issue #3): the published build while the startup
+/// check runs, and before any build a page that says why and reloads itself.
+#[test]
+fn watch_serves_the_last_build_or_says_why_there_is_none() {
+    let root = tmp("watching");
+    let page = |running| {
+        let raw = molde::testing::serve_watching(&root, "/", false, running);
+        String::from_utf8(raw).unwrap()
+    };
+    let checking = page(true);
+    assert!(
+        checking.starts_with("HTTP/1.1 503 Service Unavailable"),
+        "{checking}"
+    );
+    assert!(checking.contains("First build in progress"), "{checking}");
+    assert!(checking.contains(r#"<meta http-equiv="refresh" content="1">"#));
+    assert!(page(false).contains("did not pass"));
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("index.html"), "last good build").unwrap();
+    assert_eq!(get(&root, "/", false), (200, b"last good build".to_vec()));
+    let served = page(true);
+    assert!(
+        served.starts_with("HTTP/1.1 200") && served.ends_with("last good build"),
+        "{served}"
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
 #[test]
 fn reload_snippet_is_serve_time_and_html_only() {
     let out = tmp("inject");

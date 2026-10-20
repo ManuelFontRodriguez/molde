@@ -46,6 +46,10 @@ of release may change is in the reference's
 - `molde serve` answers a miss with the nearest `404.html` up its path, so a prefixed
   locale's `/de/404.html` shows under `/de/`; it used to show the root `/404.html`
   everywhere. Nothing to do.
+- `molde serve --watch` answers from the start: it used to accept connections and answer
+  nothing until the startup check finished (minutes on a large site). The last good
+  build is served while that check runs, and with no build yet a "first build in
+  progress" page reloads itself until one publishes. Nothing to do.
 
 ## 0.1.0 — 2026-10-19
 
