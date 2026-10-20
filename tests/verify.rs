@@ -862,3 +862,164 @@ fn encoded_base_paths_and_mismatch_keys() {
     );
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// What the adversarial review of the verify rules found (sites s1–s24 of that review),
+/// each planted in a copy of a real build.
+#[test]
+fn adversarial_review_cases() {
+    let o = || opts(BASE);
+    let canon = |c: &str| {
+        format!("<!doctype html><html><head><title>T {c}</title><link rel=\"canonical\" href=\"https://example.org{c}\"></head><body>x</body></html>")
+    };
+    let put = |d: &Path, rel: &str, html: &str| {
+        let p = d.join(rel);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, html).unwrap();
+    };
+    let cases: Vec<Case> = vec![
+        // related pages naming one page are the known patterns, not a template bug
+        (
+            "shared-related",
+            Box::new(move |d| {
+                for l in ["de", "fr", "es"] {
+                    put(
+                        d,
+                        &format!("{l}/posts/post-05/index.html"),
+                        &canon("/posts/post-05/"),
+                    );
+                }
+                for v in ["1.0", "2.0", "3.0"] {
+                    put(d, &format!("{v}/guide/index.html"), &canon("/posts/"));
+                }
+                for n in 2..5 {
+                    put(d, &format!("posts/page-{n}/index.html"), &canon("/posts/"));
+                    put(
+                        d,
+                        &format!("posts/post-05/v{n}/index.html"),
+                        &canon("/posts/post-05/"),
+                    );
+                }
+            }),
+            o(),
+            &[],
+        ),
+        // ...but content pages under archive/ and category/ naming the home page are
+        (
+            "shared-unrelated",
+            Box::new(move |d| {
+                for i in 0..5 {
+                    put(d, &format!("archive/a{i}/index.html"), &canon("/"));
+                }
+            }),
+            o(),
+            &[("canonical.shared", 1)],
+        ),
+        // a JavaScript redirect with only a <noscript> refresh is a redirect stub
+        (
+            "noscript-stub",
+            Box::new(move |d| {
+                put(d, "go.html", "<!doctype html><html><head><script>location.replace('/nope/')</script>\
+                <noscript><meta http-equiv=\"refresh\" content=\"0; url=/nope/\"></noscript></head><body></body></html>")
+            }),
+            o(),
+            &[("redirect.target_missing", 1)],
+        ),
+        // <base-button href> is a custom element, not <base>: its href is a link
+        (
+            "base-custom-element",
+            Box::new(|d| {
+                edit(d, POST, "</body>", "<base-button href=\"/posts/\">b</base-button><a href=\"../post-06/\">x</a></body>")
+            }),
+            o(),
+            &[],
+        ),
+        // a noindex print view naming its page as canonical needs no title
+        (
+            "noindex-print-view",
+            Box::new(move |d| {
+                put(d, "posts/post-05/print/index.html", "<!doctype html><html><head>\
+                <meta name=\"robots\" content=\"noindex\"><link rel=\"canonical\" href=\"https://example.org/posts/post-05/\"></head><body>x</body></html>")
+            }),
+            o(),
+            &[],
+        ),
+        // a page that reloads itself is not a redirect: it is still held to a title
+        (
+            "self-refresh",
+            Box::new(move |d| {
+                put(d, "live/index.html", "<!doctype html><html><head>\
+                <meta http-equiv=\"refresh\" content=\"30; url=/live/\"></head><body>x</body></html>")
+            }),
+            o(),
+            &[("titles.missing", 1)],
+        ),
+        // a refresh resolves from the page's <base>
+        (
+            "refresh-base",
+            Box::new(move |d| {
+                put(d, "r/go.html", "<!doctype html><html><head><base href=\"/posts/\">\
+                <meta http-equiv=\"refresh\" content=\"0; url=post-05/\"></head><body></body></html>")
+            }),
+            o(),
+            &[],
+        ),
+    ];
+    for (tag, plant, opts, want) in cases {
+        assert_eq!(planted(tag, plant, opts), map(want), "{tag}");
+    }
+}
+
+/// A site whose every page is noindex is a warning: a staging setting that may have shipped.
+#[test]
+fn a_whole_noindex_site_is_said() {
+    let dir = std::env::temp_dir().join(format!("molde-verify-allnoindex-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    for p in ["index.html", "a.html"] {
+        fs::write(dir.join(p), "<!doctype html><html><head><title>t</title><meta name=\"robots\" content=\"noindex\"></head></html>").unwrap();
+    }
+    let r = molde::run_verify(&dir, &molde::VerifyOptions::default()).unwrap();
+    assert_eq!(
+        ids(&r, "warnings").get("verify.all_noindex"),
+        Some(&1),
+        "{r:#}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// Sixteen levels of two links to one folder: each real folder is walked once (the walk
+/// used to grow as 2^16). And .git is never part of the build, node_modules not when the
+/// folder is a published repository.
+#[cfg(unix)]
+#[test]
+fn the_walk_visits_each_real_folder_once() {
+    let dir = std::env::temp_dir().join(format!("molde-verify-diamond-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("index.html"), "<!doctype html><html><head><title>t</title></head><body><a href=\"/.git/x.html\">g</a></body></html>").unwrap();
+    let mut level = dir.join("l0");
+    fs::create_dir_all(&level).unwrap();
+    for i in 1..=16 {
+        let next = dir.join(format!("l{i}"));
+        fs::create_dir_all(&next).unwrap();
+        std::os::unix::fs::symlink(&next, level.join("a")).unwrap();
+        std::os::unix::fs::symlink(&next, level.join("b")).unwrap();
+        level = next;
+    }
+    fs::create_dir_all(dir.join(".git")).unwrap();
+    fs::write(
+        dir.join(".git/x.html"),
+        "<!doctype html><html><head></head></html>",
+    )
+    .unwrap();
+    let started = std::time::Instant::now();
+    let r = molde::run_verify(&dir, &molde::VerifyOptions::default()).unwrap();
+    assert!(started.elapsed().as_secs() < 10, "{:?}", started.elapsed());
+    assert_eq!(
+        errors(&r),
+        map(&[("links.internal", 1)]),
+        "{:#}",
+        r["errors"]
+    );
+    let _ = fs::remove_dir_all(&dir);
+}

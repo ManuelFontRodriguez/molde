@@ -97,7 +97,8 @@ enum Cmd {
         /// The built site: the folder the generator wrote (public/, dist/, out/, _site/).
         dir: PathBuf,
         /// The site's public address, with its base path if it has one
-        /// (https://user.github.io/repo/). Turns on the canonical, sitemap and robots checks.
+        /// (https://user.github.io/repo/). Turns on the canonical, sitemap, robots and own-address
+        /// link checks.
         #[arg(long, value_parser = molde::parse_base_url)]
         base_url: Option<String>,
         /// The host serves /a from a.html (Netlify, Vercel, Cloudflare Pages, GitHub Pages).

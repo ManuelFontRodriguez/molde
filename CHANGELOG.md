@@ -25,7 +25,7 @@ of release may change is in the reference's
   - **New check ids:** `links.outside_base`, `links.clean_urls`, `canonical.off_host`,
     `canonical.target_missing`, `canonical.target_noindex`, `canonical.shared`, `redirect.target_missing`,
     `sitemap.non_canonical_listed`, `sitemap.not_found`, `verify.base_url_mismatch`,
-    `verify.no_pages` and `verify.project_root`.
+    `verify.no_pages`, `verify.project_root` and the warning `verify.all_noindex`.
   - **Release gate:** each generator's official starter, committed in
     `tests/verify/fixtures`.
   - See [Verify any site](docs/reference.md#verify-any-site). `molde check` is unchanged.

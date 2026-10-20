@@ -21,6 +21,8 @@ pub(crate) struct PageFacts {
     pub(crate) noindex: bool,
     /// The target of a `<meta http-equiv="refresh" content="0; url=…">`, as written.
     pub(crate) refresh: Option<String>,
+    /// The first `<base href>`, entities decoded: redirects resolve from it too.
+    pub(crate) base_href: Option<String>,
     pub(crate) canonicals: Vec<String>,
     pub(crate) og_url: Vec<String>,
     pub(crate) og_title: Vec<String>,
@@ -38,34 +40,48 @@ pub(crate) struct PageFacts {
     pub(crate) jsonld_errors: Vec<(usize, String)>,
 }
 
-/// Every `.html` / `.htm` file under `dir` (any case), sorted, `/`-separated.
-pub(crate) fn html_files(dir: &Path) -> Result<Vec<String>> {
-    Ok(all_files(dir)?
-        .into_iter()
+/// The `.html` / `.htm` files (any case) among `all`, in its order.
+pub(crate) fn html_files(all: &[String]) -> Vec<String> {
+    all.iter()
         .filter(|f| {
             let lower = f.to_ascii_lowercase();
             lower.ends_with(".html") || lower.ends_with(".htm")
         })
-        .collect())
+        .cloned()
+        .collect()
 }
 
-/// Every file under `dir`, sorted, `/`-separated. Symlinks are not followed out of `dir`.
-pub(crate) fn all_files(dir: &Path) -> Result<Vec<String>> {
-    // a symlink is followed when it stays inside the build: hosts serve the file it
-    // names (a deploy uploads it). One that leaves the build is not descended into or
-    // listed, and a loop ends the walk of that branch. Only symlinks are resolved.
+/// Every file under `dir`, sorted, `/`-separated. `.git` is never part of a build; with
+/// `project_root` (a repository published as is) neither is `node_modules`.
+///
+/// A symlink is followed when it stays inside the build: hosts serve the file it names
+/// (a deploy uploads it). One that leaves the build is not descended into or listed.
+/// Each real folder is walked once, so links that reach one folder by many paths (a
+/// pnpm `node_modules`, a diamond of links) can't multiply the walk. Only symlinks are
+/// resolved.
+pub(crate) fn all_files(dir: &Path, project_root: bool) -> Result<Vec<String>> {
     let root = dir.canonicalize()?;
-    let inside = |e: &walkdir::DirEntry| {
-        !e.path_is_symlink()
-            || e.path()
-                .canonicalize()
-                .is_ok_and(|real| real.starts_with(&root))
+    let mut seen = std::collections::HashSet::new();
+    let mut keep = |e: &walkdir::DirEntry| {
+        if e.depth() > 0 && e.file_type().is_dir() {
+            let name = e.file_name().to_string_lossy();
+            if name == ".git" || project_root && name == "node_modules" {
+                return false;
+            }
+        }
+        if !e.path_is_symlink() {
+            return true;
+        }
+        match e.path().canonicalize() {
+            Ok(real) if real.starts_with(&root) => !e.file_type().is_dir() || seen.insert(real),
+            _ => false,
+        }
     };
     let mut files = Vec::new();
     for entry in walkdir::WalkDir::new(dir)
         .follow_links(true)
         .into_iter()
-        .filter_entry(inside)
+        .filter_entry(|e| keep(e))
     {
         let Ok(entry) = entry else { continue };
         if entry.file_type().is_file() {
@@ -99,34 +115,7 @@ impl LinkCtx<'_> {
     /// The broken ones among a file's references, each written link once.
     fn judge(&self, rel: &str, base_href: Option<&str>, refs: Vec<Ref>) -> Vec<Broken> {
         let page_dir = url::page_dir(rel, self.site);
-        // `<base href>` moves where relative links start from: a folder of this host, or
-        // somewhere verify can't follow (another host, or any absolute URL without
-        // --base-url), where relative links are not this build's to judge
-        let base_dir = base_href.and_then(|b| {
-            let folder = |d: String| {
-                if d.ends_with('/') {
-                    d
-                } else {
-                    d.rsplit_once('/')
-                        .map_or("/".into(), |(a, _)| format!("{a}/"))
-                }
-            };
-            match url::resolve(b, &page_dir, None, self.site) {
-                Target::Site(p) => {
-                    let base = self
-                        .site
-                        .map_or("/", |s| s.base.as_str())
-                        .trim_end_matches('/');
-                    Some(Some(folder(format!("{base}{p}"))))
-                }
-                Target::OutsideBase(p) => Some(Some(folder(p))),
-                // `#top` or `?q` only: the page's own address, so no move at all
-                Target::Elsewhere if !b.trim().is_empty() && !b.trim().starts_with(['#', '?']) => {
-                    Some(None)
-                }
-                _ => None,
-            }
-        });
+        let base_dir = base_dir(&page_dir, base_href, self.site);
         let mut seen = std::collections::BTreeSet::new();
         let mut broken = Vec::new();
         for r in refs {
@@ -162,6 +151,54 @@ impl LinkCtx<'_> {
             }
         }
         broken
+    }
+}
+
+/// Where `<base href>` moves a page's relative links (`page_dir` is the page's public
+/// folder): None for no move; Some(Some(folder)) to a folder of this host; Some(None)
+/// somewhere verify can't follow (another host, or any absolute URL without
+/// --base-url), where relative links are not this build's to judge.
+pub(crate) fn base_dir(
+    page_dir: &str,
+    base_href: Option<&str>,
+    site: Option<&Address>,
+) -> Option<Option<String>> {
+    let b = base_href?;
+    let folder = |d: String| {
+        if d.ends_with('/') {
+            d
+        } else {
+            d.rsplit_once('/')
+                .map_or("/".into(), |(a, _)| format!("{a}/"))
+        }
+    };
+    match url::resolve(b, page_dir, None, site) {
+        Target::Site(p) => {
+            let base = site.map_or("/", |s| s.base.as_str()).trim_end_matches('/');
+            Some(Some(folder(format!("{base}{p}"))))
+        }
+        Target::OutsideBase(p) => Some(Some(folder(p))),
+        // `#top` or `?q` only: the page's own address, so no move at all
+        Target::Elsewhere if !b.trim().is_empty() && !b.trim().starts_with(['#', '?']) => {
+            Some(None)
+        }
+        _ => None,
+    }
+}
+
+/// Resolve `written` from a page as a browser does, `<base href>` included. None when
+/// the base takes a relative link out of verify's reach.
+pub(crate) fn resolve_from(
+    written: &str,
+    rel: &str,
+    base_href: Option<&str>,
+    site: Option<&Address>,
+) -> Option<Target> {
+    let page_dir = url::page_dir(rel, site);
+    match base_dir(&page_dir, base_href, site) {
+        Some(None) if url::is_relative(written) => None,
+        Some(Some(d)) => Some(url::resolve(written, &page_dir, Some(&d), site)),
+        _ => Some(url::resolve(written, &page_dir, None, site)),
     }
 }
 
@@ -213,7 +250,8 @@ fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
         (
             regex::Regex::new(r"(?i)<!doctype|<html[\s>]|<head[\s>]").unwrap(),
             regex::Regex::new(r"(?is)<title\b[^>]*>(.*?)</title\s*>").unwrap(),
-            regex::Regex::new(r"(?is)<base\b[^>]*>").unwrap(),
+            // `<base>`, not a custom element named `base-…` (`<base-button>`)
+            regex::Regex::new(r"(?is)<base(?:[\s/][^>]*)?>").unwrap(),
             regex::Regex::new(
                 r#"(?is)<script\s(?:[^>]*\s)?type\s*=\s*["']?application/ld\+json(?:\s*;[^"'>]*)?(?:["'\s][^>]*)?>(.*?)</script"#,
             )
@@ -243,18 +281,34 @@ fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
     let noscript =
         NOSCRIPT.get_or_init(|| regex::Regex::new(r"(?is)<noscript\b.*?</noscript\s*>").unwrap());
     let scripted = noscript.replace_all(&markup, "");
-    let refresh = meta_tag_re().find_iter(&scripted).find_map(|m| {
-        let tag = m.as_str();
-        let mut is_refresh = false;
-        let mut content = None;
-        for cap in attr_re().captures_iter(tag) {
-            match cap[1].to_ascii_lowercase().as_str() {
-                "http-equiv" => is_refresh = attr_value(&cap).eq_ignore_ascii_case("refresh"),
-                "content" => content = Some(unescape_entities(attr_value(&cap))),
-                _ => {}
+    let refresh_in = |html: &str| {
+        meta_tag_re().find_iter(html).find_map(|m| {
+            let tag = m.as_str();
+            let mut is_refresh = false;
+            let mut content = None;
+            for cap in attr_re().captures_iter(tag) {
+                match cap[1].to_ascii_lowercase().as_str() {
+                    "http-equiv" => is_refresh = attr_value(&cap).eq_ignore_ascii_case("refresh"),
+                    "content" => content = Some(unescape_entities(attr_value(&cap))),
+                    _ => {}
+                }
             }
+            refresh_url(&content.filter(|_| is_refresh)?)
+        })
+    };
+    // ...unless the page is nothing but that fallback (a JavaScript redirect with a
+    // <noscript> refresh, no title, no text): then it is a redirect stub
+    let refresh = refresh_in(&scripted).or_else(|| {
+        if first_title.is_some() || scripted.len() == markup.len() {
+            return None;
         }
-        refresh_url(&content.filter(|_| is_refresh)?)
+        static TAG: OnceLock<regex::Regex> = OnceLock::new();
+        let tag = TAG.get_or_init(|| regex::Regex::new(r"(?s)<[^>]*>").unwrap());
+        tag.replace_all(&scripted, "")
+            .trim()
+            .is_empty()
+            .then(|| refresh_in(&markup))
+            .flatten()
     });
     // the first <base> that has an href is the one browsers use
     let base_href = base_re.find_iter(&markup).find_map(|m| {
@@ -306,6 +360,7 @@ fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
         is_document,
         noindex: has_noindex(&markup),
         refresh,
+        base_href,
         canonicals,
         og_url: tag_attrs(&markup, meta_tag_re(), "property", "og:url", "content"),
         og_title: tag_attrs(&markup, meta_tag_re(), "property", "og:title", "content"),

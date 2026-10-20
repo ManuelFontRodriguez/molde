@@ -121,8 +121,8 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
         r["build"] = Value::Null;
         return Ok(r);
     }
-    let all = scan::all_files(dir)?;
-    let html = scan::html_files(dir)?;
+    let all = scan::all_files(dir, opts.allow_project_root)?;
+    let html = scan::html_files(&all);
     let files = Files::new(all.iter().cloned(), opts.clean_urls);
     let given = opts.base_url.as_deref().and_then(Address::parse);
     // the same glob rules as size budgets: `*` within a segment, `**` across them
@@ -278,6 +278,13 @@ fn judge(
         skipped: Vec::new(),
     };
     run.errors.extend(links(facts, broken, css));
+    // a whole site asking not to be indexed is usually a staging setting that shipped;
+    // a warning, since a staging build is exactly that on purpose
+    let noindex = kinds.iter().filter(|k| **k == Kind::Noindex).count();
+    if noindex > 0 && !kinds.contains(&Kind::Indexable) {
+        run.warnings
+            .push(json!({"layer": "output", "check": "verify.all_noindex", "pages": noindex}));
+    }
     let (e, w) = uniqueness(facts, &kinds, opts.unique);
     run.errors.extend(e);
     run.warnings.extend(w);
@@ -369,7 +376,7 @@ fn classify(
                 Kind::NotDocument
             } else if is_not_found_page(&rel) || fallback.as_deref() == Some(rel.as_str()) {
                 Kind::NotFound
-            } else if f.refresh.is_some() || canonical_elsewhere(f, site, files) {
+            } else if refreshes_elsewhere(f, site, files) || canonical_elsewhere(f, site, files) {
                 Kind::Redirect
             } else if f.noindex {
                 Kind::Noindex
@@ -391,6 +398,16 @@ pub(crate) fn is_not_found_page(rel: &str) -> bool {
         || name("_not-found/index.html")
         || rel == "200.html"
         || rel == "__spa-fallback.html"
+}
+
+/// Does the page's meta refresh lead away from it? A refresh to the page itself (a
+/// live page that reloads every 30 seconds) is not a redirect.
+fn refreshes_elsewhere(f: &PageFacts, site: Option<&Address>, files: &Files) -> bool {
+    let Some(t) = &f.refresh else { return false };
+    match scan::resolve_from(t, &f.rel, f.base_href.as_deref(), site) {
+        Some(Target::Site(p)) => files.file_for(&p).is_none_or(|file| file != f.rel),
+        _ => true,
+    }
 }
 
 /// Does the page's canonical name another file of this build (an alias, a pager)?
@@ -581,11 +598,7 @@ fn group_by_target(errors: Vec<(Value, String)>) -> Vec<Value> {
 fn is_list_page(rel: &str) -> bool {
     let segs: Vec<&str> = rel.split('/').collect();
     let number = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
-    // `page/2/` (Hugo, Eleventy, Astro) and Jekyll's `page2/`
-    let pager = segs.windows(2).any(|w| w[0] == "page" && number(w[1]))
-        || segs
-            .iter()
-            .any(|s| s.strip_prefix("page").is_some_and(number));
+    let pager = is_pager(&segs, number);
     // a taxonomy folder at any depth (`tags/x/`, `fr/tags/x/`, `blog/category/x/`)
     let folders = &segs[..segs.len().saturating_sub(1)];
     let taxonomy = folders.iter().any(|s| {
@@ -602,6 +615,17 @@ fn is_list_page(rel: &str) -> bool {
         )
     });
     pager || taxonomy
+}
+
+/// A pager's path: `page/2/` (Hugo, Eleventy, Astro), `p/2/`, Jekyll's `page2/`, `page-2/`.
+fn is_pager(segs: &[&str], number: impl Fn(&str) -> bool) -> bool {
+    segs.windows(2)
+        .any(|w| (w[0] == "page" || w[0] == "p") && number(w[1]))
+        || segs.iter().any(|s| {
+            s.strip_prefix("page")
+                .map(|n| n.strip_prefix('-').unwrap_or(n))
+                .is_some_and(&number)
+        })
 }
 
 /// titles.duplicate and description.duplicate among indexable documents (§5). By default
@@ -713,7 +737,7 @@ fn page_content(facts: &[PageFacts], kinds: &[Kind]) -> Vec<Value> {
         }
         // a noindex page is no one's search result: a frame's content (mdBook's toc.html)
         // or a print view may go without a title
-        if f.title.is_empty() && *k != Kind::Noindex {
+        if f.title.is_empty() && !f.noindex {
             errors.push(json!({"layer": "output", "check": "titles.missing", "page": f.rel}));
         }
         if f.title_count > 1 {
@@ -764,8 +788,12 @@ fn redirects(
         let Some(t) = f.refresh.as_ref().or(f.canonicals.first()) else {
             continue;
         };
-        let page_dir = url::page_dir(&f.rel, site);
-        if let Target::Site(p) = url::resolve(t, &page_dir, None, site) {
+        let base = if by_canonical {
+            None
+        } else {
+            f.base_href.as_deref()
+        };
+        if let Some(Target::Site(p)) = scan::resolve_from(t, &f.rel, base, site) {
             match files.file_for(&p) {
                 None if !ignored(&p) => errors.push(
                     json!({"layer": "output", "check": "redirect.target_missing", "page": f.rel, "target": t, "_path": p}),
@@ -787,19 +815,37 @@ fn redirects(
 }
 
 /// Pages that name another page as canonical are taken for aliases and judged by their
-/// target only, which is right for one alias and hides a template bug: many pages naming
-/// one page (every canonical hard-coded to the home page) is one `canonical.shared`
-/// error. Pager and taxonomy pages that name their first page are a known pattern, and
-/// don't count. A single wrong canonical to an existing page can't be told from an alias.
+/// target only, which is right for one alias and hides a template bug: every canonical
+/// hard-coded to one page. That is `canonical.shared`: three or more pages, and at
+/// least a tenth of the documents, naming one page they are not related to. Related is
+/// the known patterns: a pager naming its first page, a variant naming its folder's page
+/// (`/x/amp/` → `/x/`, never the home page), and a copy with the same last path segment
+/// (an untranslated `/de/about/` → `/about/`, versioned docs `/1.0/x/` → `/latest/x/`).
+/// A single canonical to another existing page can't be told from an alias.
 fn shared_canonicals(
     facts: &[PageFacts],
     kinds: &[Kind],
     site: Option<&Address>,
     files: &Files,
 ) -> Vec<Value> {
+    // "de/about/index.html" -> ["de", "about"]; "a/b.html" -> ["a", "b"]
+    fn segments(rel: &str) -> Vec<&str> {
+        let path = rel.strip_suffix("index.html").unwrap_or(rel);
+        let path = path.strip_suffix(".html").unwrap_or(path);
+        path.split('/').filter(|s| !s.is_empty()).collect()
+    }
+    let number = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
+    let related = |page: &str, target: &str| {
+        let (p, t) = (segments(page), segments(target));
+        let pager = is_pager(&p, number);
+        let variant = !t.is_empty() && p.len() > t.len() && p.starts_with(&t);
+        let copy = !t.is_empty() && p.last() == t.last();
+        pager || variant || copy
+    };
+    let documents = kinds.iter().filter(|k| k.is_document()).count();
     let mut by_target: BTreeMap<String, Vec<&str>> = BTreeMap::new();
     for (f, k) in facts.iter().zip(kinds) {
-        if *k != Kind::Redirect || f.refresh.is_some() || is_list_page(&f.rel) {
+        if *k != Kind::Redirect || f.refresh.is_some() {
             continue;
         }
         let Some(canonical) = f.canonicals.first() else {
@@ -807,13 +853,15 @@ fn shared_canonicals(
         };
         if let Target::Site(p) = url::resolve(canonical, &url::page_dir(&f.rel, site), None, site) {
             if let Some(file) = files.file_for(&p) {
-                by_target.entry(file).or_default().push(&f.rel);
+                if !related(&f.rel, &file) {
+                    by_target.entry(file).or_default().push(&f.rel);
+                }
             }
         }
     }
     by_target
         .into_iter()
-        .filter(|(_, pages)| pages.len() >= 3)
+        .filter(|(_, pages)| pages.len() >= 3 && pages.len() * 10 >= documents)
         .map(|(target, pages)| {
             json!({"layer": "output", "check": "canonical.shared", "target": target,
                    "page": pages[0], "count": pages.len(), "examples": pages.iter().take(5).collect::<Vec<_>>()})
@@ -1091,6 +1139,7 @@ fn hint(check: &str) -> Option<&'static str> {
         "og.title_mismatch" => "og:title and <title> say different things",
         "verify.no_pages" => "no HTML documents in this folder: is the build empty, or is this the wrong folder?",
         "verify.base_url_mismatch" => "the site's own canonicals use another address than --base-url (or a base path, and no --base-url was given): pass the address in `found` (or rebuild the site for the one you gave)",
+        "verify.all_noindex" => "every page of the site asks search engines not to index it (robots noindex): fine for a staging build, a mistake if this is the site going live",
         "verify.project_root" => "this is the project's folder: run verify on its build output (or, for a repository published as is, pass --allow-project-root)",
         _ => return None,
     })
