@@ -11,7 +11,8 @@ a bug: file it.
 [Locale data](#locale-data) · [Template contract](#template-contract) ·
 [JSON-LD](#json-ld) · [Partials & macros](#partials--macros) ·
 [URL conventions](#url-conventions) · [Output layout](#output-layout) ·
-[The check report](#the-check-report) · [Security model](#security-model) ·
+[The check report](#the-check-report) · [Verify any site](#verify-any-site) ·
+[Security model](#security-model) ·
 [Compatibility](#compatibility) · [Commands](#commands)
 
 ## Site anatomy
@@ -759,6 +760,90 @@ binding (`:href`, `x-bind:href`, `v-bind:src`) holds code, not a URL, and is not
   meaning. Text escaped twice is the one content error they catch
   (`html.double_escaped`); inside `<pre>`, `<code>` and `<textarea>` it is not checked.
 
+## Verify any site
+
+`molde verify DIR` checks a folder of built HTML that any generator wrote: Hugo's
+`public/`, Astro's `dist/`, a Next.js static export's `out/`, Eleventy's `_site/`, Zola's
+`public/`, or molde's own `out/current`. It reads the files only, prints one JSON report in
+`check`'s shape, and exits 1 when there is an error, 0 otherwise. Warnings never fail it.
+Nothing is published: a foreign site deploys through its own CI, where the exit code is the
+gate.
+
+```sh
+molde verify public --base-url https://example.com/
+molde verify out --base-url https://user.github.io/repo/ --clean-urls
+```
+
+| Flag | Meaning |
+|---|---|
+| `--base-url URL` | the site's public address, with its base path if it has one. Turns on the canonical, sitemap, robots.txt and own-address checks; without it they are skipped, and the report suggests the address the pages' canonicals use |
+| `--clean-urls` | the host serves `/a` from `a.html` (Netlify, Vercel, Cloudflare Pages, GitHub Pages; not S3 or CloudFront) |
+| `--ignore GLOB` | a site path that isn't this build's to check (`/cdn-cgi/**`, `/api/**`), with the glob rules of size budgets. Repeatable |
+| `--spa-fallback PATH` | the host serves this file for every unknown page (a single-page app): a link to a page that isn't a file is fine; a missing asset still isn't |
+| `--require-canonical` | an indexable page without a canonical is an error (`canonical.missing`) |
+| `--og` | require the Open Graph block (`og.missing`) and an og:title that agrees with the title (`og.title_mismatch`) |
+| `--sitemap-complete` | an indexable page missing from the sitemap is an error, not a warning |
+| `--unique` | duplicate titles and descriptions are errors, not warnings, except where a pager or taxonomy page is involved |
+
+**What a file is.** Every `.html` and `.htm` file, in any case, is one of the following,
+and each check judges it by that:
+
+| Kind | Recognised by | Held to |
+|---|---|---|
+| `not_document` | no `<html`, `<head` or doctype in its first 2 KB (a verification file, a fragment) | nothing |
+| `not_found` | `404.html`, `404/index.html`, `_not-found.html`, `_not-found/index.html`, `200.html` | its links only |
+| `redirect` | a meta refresh, or a canonical to another page of the build (an alias, a pager) | its links and its target |
+| `noindex` | a robots noindex meta | links and titles; kept out of the sitemap and of uniqueness |
+| `indexable` | everything else | every check |
+
+The report's `pages` counts each kind.
+
+**Checks.** `check`'s ids where the meaning is the same, new ids where verify judges what
+`check` can't see:
+
+| check | when | fires when |
+|---|---|---|
+| `links.internal` | always | a link or asset (`href`, `src`, `srcset`, CSS `url()` and `@import`) names no file of the build. The same missing page linked from three or more pages is one error, with `target`, `count` and `pages` |
+| `links.outside_base` | with a base path | a link leaves the base path (`/posts/x/` on a site at `/repo/`): it works on disk and 404s in production |
+| `links.clean_urls` | without `--clean-urls` | most broken links would resolve as `a.html`: one error saying to try `--clean-urls` |
+| `titles.missing`, `titles.multiple` | documents | as in `check` |
+| `titles.duplicate`, `description.duplicate` | indexable documents | warnings; errors with `--unique` |
+| `html.double_escaped`, `jsonld.invalid` | documents | as in `check` |
+| `canonical.duplicate`, `og.duplicate` | documents | as in `check` |
+| `canonical.off_host` | with `--base-url` | the canonical is on another host, or outside the base path |
+| `canonical.target_missing` | with `--base-url` | the canonical names a page this build doesn't have |
+| `canonical.target_noindex` | with `--base-url` | the canonical names a page that asks not to be indexed |
+| `canonical.missing` | with `--require-canonical` | an indexable page has none |
+| `redirect.target_missing` | with `--base-url` | a meta refresh or an alias leads to a page this build doesn't have |
+| `sitemap.dangling`, `sitemap.noindex_listed` | with a sitemap | as in `check` |
+| `sitemap.non_canonical_listed` | with a sitemap | the sitemap lists a redirect: list the page it points to |
+| `sitemap.missing_page` | with a sitemap | a warning; an error with `--sitemap-complete` |
+| `sitemap.not_found` | with `--base-url` | a warning: no sitemap found |
+| `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a `robots.txt` | robots.txt names no sitemap in the build / shuts every crawler out of a site with pages to index |
+| `og.missing`, `og.title_mismatch` | with `--og` | |
+| `verify.base_url_mismatch` | with `--base-url` | the pages claim another address (their canonicals' host and base path), and it explains most of the errors: one error naming it (`found`), plus the errors that remain under both addresses |
+| `verify.no_pages` | always | the folder has no HTML documents (an empty build) |
+| `verify.project_root` | always | the folder is a project (it holds `package.json`, `hugo.toml`, …), not its output: the message names the output folder |
+
+**The sitemap** is the first that exists: one robots.txt names, `sitemap.xml`,
+`sitemap-index.xml` or `sitemap_index.xml`. A sitemap index is followed into its children,
+and `<loc>`s are read namespaced or in CDATA.
+
+**The report** has `check`'s fields (`verdict`, `published`, always `false`, `build`,
+`errors`), plus:
+- `"command": "verify"`;
+- `pages`, the counts by kind;
+- `warnings`;
+- `skipped`, each family that didn't run and why (`[{"checks", "reason", "suggestion"?}]`).
+
+Errors carry `page` but no `route` or `template`: verify can't know which source made a
+page, and only molde's own `check` can. That is the difference between the two: run
+`check` on a molde site, and `verify` on anyone's.
+
+**What verify doesn't do:** fetch anything, run JavaScript, judge the text, check locales
+and size budgets, or follow `--base-url` guesses. Everything in [what the checks do not
+see](#what-the-checks-do-not-see) applies too, except that verify honours `<base href>`.
+
 ## Security model
 
 molde reads a site folder and writes an out folder. Everything in between is local:
@@ -875,6 +960,7 @@ molde events --site S --out O          # POST /hint -> verified rebuild (body ig
 molde mcp    --site S --out O          # MCP on stdio: check, list_routes, explain_route,
                                        #   render_page (live preview), diff_build
 molde guide                            # docs/agents.md: a short guide to this reference
+molde verify DIR [--base-url URL]      # check any generator's built output (see Verify any site)
 ```
 
 `diff` prints `from`, `to`, `added`, `removed`, `unchanged` and `changed` (per page its

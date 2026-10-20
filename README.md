@@ -174,6 +174,22 @@ A linter such as ESLint reads your source code, one file at a time, for patterns
 Use both: a linter keeps the code clean, and the check tells you the site you are about to
 publish is right.
 
+### A site molde didn't build
+
+`molde verify` runs the same kind of check on any generator's output: Hugo, Astro, a
+Next.js static export, Eleventy, Zola.
+
+```sh
+molde verify public --base-url https://example.com/
+```
+
+It checks that the links, the canonicals, the sitemap, noindex and robots.txt agree with
+the pages and with each other, offline, on the folder you are about to deploy, and it
+prints the same JSON report. It also understands base paths (a GitHub Pages site at
+`/repo/`) and clean URLs. Errors name the page, but not the template (only molde knows
+that). It is tested on each generator's official starter. See
+[Verify any site](docs/reference.md#verify-any-site).
+
 ## In CI or a script
 
 `molde check` exits 0 when every check passes and the build is published, 1 when a check
@@ -243,6 +259,7 @@ molde serve  --out O [--watch --site S --reload]   # local preview, recheck on s
 molde mcp    --site S --out O          # the agent server (MCP over stdio)
 molde events --site S --out O          # POST /hint -> a verified rebuild
 molde guide                            # a short guide for agents and people
+molde verify DIR --base-url URL        # check any generator's built output
 ```
 
 ## Documentation

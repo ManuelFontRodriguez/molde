@@ -16,6 +16,19 @@ of release may change is in the reference's
 - The check report's `pages_by_locale` entries and `i18n.sparse_locale` warnings carry
   the route's `template` and, on `foreach` routes, `foreach` (the collection) next to
   `route`, so routes that share a path pattern can be told apart. Nothing to do.
+- `molde verify DIR`: molde's output checks on any generator's build (Hugo, Astro, a
+  Next.js static export, Eleventy, Zola, or molde's own `out/current`). It prints `check`'s
+  report shape plus `command`, `pages`, `warnings` and `skipped`, and exits 1 on an error.
+  - **Rules for foreign output:** every file is classified (not-found pages, redirects and
+    aliases, noindex pages), and one URL model handles base paths, clean URLs and
+    `<base href>`.
+  - **New check ids:** `links.outside_base`, `links.clean_urls`, `canonical.off_host`,
+    `canonical.target_missing`, `canonical.target_noindex`, `redirect.target_missing`,
+    `sitemap.non_canonical_listed`, `sitemap.not_found`, `verify.base_url_mismatch`,
+    `verify.no_pages` and `verify.project_root`.
+  - **Release gate:** each generator's official starter, committed in
+    `tests/verify/fixtures`.
+  - See [Verify any site](docs/reference.md#verify-any-site). `molde check` is unchanged.
 
 ### Changed
 
