@@ -64,7 +64,7 @@ molde runs on **Linux and macOS** (Windows: use WSL).
 put `molde` on your `PATH`:
 
 ```sh
-VERSION=0.1.0
+VERSION=0.2.0
 TARGET=aarch64-apple-darwin        # or x86_64-apple-darwin, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl
 curl -fLO "https://github.com/ManuelFontRodriguez/molde/releases/download/v$VERSION/molde-$VERSION-$TARGET.tar.gz"
 curl -fLO "https://github.com/ManuelFontRodriguez/molde/releases/download/v$VERSION/SHA256SUMS"
@@ -81,7 +81,7 @@ avoids that (or run `xattr -d com.apple.quarantine molde`).
 **From source** (Rust 1.89 or newer, from [rustup.rs](https://rustup.rs)):
 
 ```sh
-cargo install --locked --git https://github.com/ManuelFontRodriguez/molde --tag v0.1.0
+cargo install --locked --git https://github.com/ManuelFontRodriguez/molde --tag v0.2.0
 ```
 
 ## Your first site in five minutes
@@ -335,7 +335,7 @@ molde verify DIR --base-url URL        # check any generator's built output
 
 ## Status
 
-molde is at **0.1.0**, its first public version. It
+molde is at **0.2.0**. It
 builds three sites in production, every day, from their data:
 [proximosdividendos.info](https://proximosdividendos.info) (about 2,900 pages),
 [whichindex.com](https://whichindex.com) (about 12,200) and
