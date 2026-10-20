@@ -96,11 +96,27 @@ fn respond(root: &Path, url_path: &str) -> (u16, &'static str, Vec<u8>) {
     match fs::read(&file) {
         Ok(bytes) => (200, content_type(&file), bytes),
         // the host convention (nginx error_page, S3, Netlify): a site-provided
-        // /404.html is the body of every miss, served with the real 404 status
-        Err(_) => match fs::read(root.join("404.html")) {
-            Ok(bytes) => (404, "text/html; charset=utf-8", bytes),
-            Err(_) => (404, "text/plain", b"not found".to_vec()),
+        // 404.html is the body of every miss, served with the real 404 status. The
+        // nearest one up the path wins, so a prefixed locale's /de/404.html answers
+        // under /de/ (Cloudflare Pages does the same)
+        Err(_) => match not_found_page(root, rel) {
+            Some(bytes) => (404, "text/html; charset=utf-8", bytes),
+            None => (404, "text/plain", b"not found".to_vec()),
         },
+    }
+}
+
+/// The `404.html` nearest to `rel`: in its directory, then each parent up to the root.
+fn not_found_page(root: &Path, rel: &str) -> Option<Vec<u8>> {
+    let mut dir = rel.rsplit_once('/').map_or("", |(d, _)| d);
+    loop {
+        if let Ok(bytes) = fs::read(root.join(dir).join("404.html")) {
+            return Some(bytes);
+        }
+        if dir.is_empty() {
+            return None;
+        }
+        dir = dir.rsplit_once('/').map_or("", |(d, _)| d);
     }
 }
 
