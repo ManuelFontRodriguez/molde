@@ -25,6 +25,7 @@ mod routes;
 mod serve;
 mod site;
 mod store;
+mod verify;
 
 pub use build::{build, BuildReport};
 pub use check::run_check;
@@ -32,6 +33,7 @@ pub use diff::diff_builds;
 pub use render::render_url;
 pub use serve::{serve, WatchOpts};
 pub use store::gc_builds;
+pub use verify::{parse_base_url, run_verify, spa_fallback_error, VerifyOptions};
 
 /// Internals the integration tests reach. Not part of the API: no stability promise.
 #[doc(hidden)]

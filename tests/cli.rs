@@ -342,3 +342,49 @@ fn mcp_speaks_json_rpc_over_real_stdio() {
     assert_eq!(status.code(), Some(0));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A wrong command line exits 2 (the compatibility promise): a `--base-url` that is not
+/// a site address, and a `--spa-fallback` the build doesn't have, used to be ignored.
+#[test]
+fn verify_rejects_a_bad_base_url_and_a_missing_fallback() {
+    let dir = tmp("verify-args");
+    std::fs::write(
+        dir.join("index.html"),
+        "<!doctype html><html><head><title>x</title></head></html>",
+    )
+    .unwrap();
+    for bad in ["example.com", "https://x.example/?q", "ftp://x.example/"] {
+        let out = molde(&[
+            "verify".as_ref(),
+            dir.as_os_str(),
+            "--base-url".as_ref(),
+            bad.as_ref(),
+        ]);
+        assert_eq!(out.status.code(), Some(2), "{bad}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("not a site address"),
+            "{bad}"
+        );
+    }
+    let out = molde(&[
+        "verify".as_ref(),
+        dir.as_os_str(),
+        "--spa-fallback".as_ref(),
+        "/200.html".as_ref(),
+    ]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("no such file"));
+    let out = molde(&[
+        "verify".as_ref(),
+        dir.as_os_str(),
+        "--spa-fallback".as_ref(),
+        "/index.html".as_ref(),
+    ]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

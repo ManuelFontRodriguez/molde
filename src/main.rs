@@ -91,6 +91,42 @@ enum Cmd {
         #[arg(long, default_value_t = 10)]
         keep: usize,
     },
+    /// Check any static site's built output (Hugo, Astro, Next.js, Eleventy, Zola, …): links,
+    /// titles, canonicals, the sitemap and robots.txt agreeing with the pages. ONE JSON report.
+    Verify {
+        /// The built site: the folder the generator wrote (public/, dist/, out/, _site/).
+        dir: PathBuf,
+        /// The site's public address, with its base path if it has one
+        /// (https://user.github.io/repo/). Turns on the canonical, sitemap, robots and own-address
+        /// link checks.
+        #[arg(long, value_parser = molde::parse_base_url)]
+        base_url: Option<String>,
+        /// The host serves /a from a.html (Netlify, Vercel, Cloudflare Pages, GitHub Pages).
+        #[arg(long)]
+        clean_urls: bool,
+        /// A URL path glob that isn't this build's to check (/cdn-cgi/**, /api/**). Repeatable.
+        #[arg(long)]
+        ignore: Vec<String>,
+        /// A file the host serves for every unknown path (a single-page app's /index.html).
+        #[arg(long)]
+        spa_fallback: Option<String>,
+        /// An indexable page without a canonical is an error.
+        #[arg(long)]
+        require_canonical: bool,
+        /// Require a full Open Graph block, and an og:title that agrees with the title.
+        #[arg(long)]
+        og: bool,
+        /// An indexable page missing from the sitemap is an error, not a warning.
+        #[arg(long)]
+        sitemap_complete: bool,
+        /// Duplicate titles and descriptions are errors, not warnings (list pages excepted).
+        #[arg(long)]
+        unique: bool,
+        /// Verify the folder even though it holds a project file (package.json, hugo.toml):
+        /// a repository published as is.
+        #[arg(long)]
+        allow_project_root: bool,
+    },
     /// Print a short guide to molde for agents and people: the site layout, routes.yaml,
     /// templates, the check report and the commands (docs/agents.md).
     Guide,
@@ -189,6 +225,45 @@ fn main() -> Result<()> {
         Cmd::Gc { out, keep } => {
             let gc = molde::gc_builds(&out, keep)?;
             stdout(&format!("{}\n", serde_json::to_string_pretty(&gc)?));
+            Ok(())
+        }
+        Cmd::Verify {
+            dir,
+            base_url,
+            clean_urls,
+            ignore,
+            spa_fallback,
+            require_canonical,
+            og,
+            sitemap_complete,
+            unique,
+            allow_project_root,
+        } => {
+            if let Some(msg) = spa_fallback
+                .as_deref()
+                .and_then(|f| molde::spa_fallback_error(&dir, f))
+            {
+                use clap::CommandFactory;
+                Cli::command()
+                    .error(clap::error::ErrorKind::ValueValidation, msg)
+                    .exit();
+            }
+            let opts = molde::VerifyOptions {
+                base_url,
+                clean_urls,
+                ignore,
+                spa_fallback,
+                require_canonical,
+                og,
+                sitemap_complete,
+                unique,
+                allow_project_root,
+            };
+            let report = molde::run_verify(&dir, &opts)?;
+            stdout(&format!("{}\n", serde_json::to_string_pretty(&report)?));
+            if report["verdict"] != "pass" {
+                std::process::exit(1);
+            }
             Ok(())
         }
         Cmd::Guide => {

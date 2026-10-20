@@ -155,6 +155,7 @@ molde render /books/dune/ --site .       # one page to stdout, no build
 molde diff   --out out [--full]          # what changed between the last two builds
 molde gc     --out out --keep 5          # delete old builds
 molde mcp    --site . --out out          # the same tools over MCP, for agents
+molde verify public --base-url URL       # check a site another generator built
 ```
 
 - **Output:** `out/builds/<id>/` holds every build; `out/current` is a link to the

@@ -88,14 +88,14 @@ fn build_files(build_dir: &Path) -> Result<std::collections::HashSet<String>> {
 }
 
 /// One URL as written in the page or stylesheet, and where.
-struct Ref {
+pub(crate) struct Ref {
     /// `href`, `src` (as written in the markup), `srcset`, `url()` or `@import`.
-    attribute: String,
-    written: String,
+    pub(crate) attribute: String,
+    pub(crate) written: String,
 }
 
 /// Every URL a page makes the browser fetch or follow.
-fn html_refs(html: &str) -> Vec<Ref> {
+pub(crate) fn html_refs(html: &str) -> Vec<Ref> {
     static RES: OnceLock<[regex::Regex; 5]> = OnceLock::new();
     let [tag_re, ref_re, srcset_re, style_attr_re, style_block_re] = RES.get_or_init(|| {
         [
@@ -248,7 +248,7 @@ fn attribute_named(tag: &str, at: usize, kind: &str) -> bool {
 }
 
 /// Every `url()` and `@import` in CSS (comments skipped).
-fn css_refs(css: &str) -> Vec<Ref> {
+pub(crate) fn css_refs(css: &str) -> Vec<Ref> {
     static RES: OnceLock<(regex::Regex, regex::Regex, regex::Regex)> = OnceLock::new();
     let (comment_re, url_re, import_re) = RES.get_or_init(|| {
         (
