@@ -331,6 +331,31 @@ fn missing_t_argument_is_a_render_error() {
 }
 
 #[test]
+fn html_lang_accepts_a_region_of_the_page_locale() {
+    // `en-US` on an `en` page names the same language, more precisely: valid (#10). A
+    // region of another language (`es-US` on an `en` page) and a tag that only starts
+    // with the same letters (`eng`) are not
+    for (lang, wrong) in [
+        ("{{ locale }}-US", 0),
+        ("{{ locale }}-x-private", 0),
+        ("es-US", 2),
+        ("{{ locale }}g", 3),
+    ] {
+        let home = HOME.replace("lang=\"{{ locale }}\"", &format!("lang=\"{lang}\""));
+        let dir = site("lang-region", &[("templates/home.html.j2", &home)]);
+        let report = check(&dir);
+        let n = report["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["check"] == "html.lang")
+            .count();
+        assert_eq!(n, wrong, "lang=\"{lang}\": {report:#}");
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[test]
 fn wrong_html_lang_and_stray_hreflang_fail() {
     let home = HOME
         .replace("lang=\"{{ locale }}\"", "lang=\"es\"")
