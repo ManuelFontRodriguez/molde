@@ -29,6 +29,14 @@ of release may change is in the reference's
   - **Release gate:** each generator's official starter, committed in
     `tests/verify/fixtures`.
   - See [Verify any site](docs/reference.md#verify-any-site). `molde check` is unchanged.
+- A GitHub Action (`uses: ManuelFontRodriguez/molde@<version>`) runs `check` or `verify`:
+  - it downloads the release it is pinned to (or `version:`), with its SHA-256 checked;
+  - it writes the report to the job summary and keeps one comment on the pull request up
+    to date, per workflow, job and site, escaping everything the report quotes;
+  - it fails the job when the check fails (its verdict, or molde's exit code);
+  - every input is in `action.yml`.
+
+  CI runs the action on the fixtures in every pull request.
 
 ### Changed
 

@@ -202,6 +202,35 @@ molde check --site my-site --out out > report.json || {
 }
 ```
 
+**On GitHub,** the molde action does the same in one step. It downloads the release (its
+SHA-256 checked), runs the command, writes the report to the job summary and keeps one
+comment on the pull request up to date:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write          # for the comment; without it, the summary still has the report
+steps:
+  - uses: actions/checkout@v4
+  - run: hugo --cleanDestinationDir   # or any generator; for a molde site, skip this
+  - uses: ManuelFontRodriguez/molde@v0.2.0
+    with:
+      command: verify               # or check, with site: and out:
+      dir: public
+      base-url: https://example.com/
+```
+
+It fails the job when the check fails (`fail-on-error: "false"` to only report), and sets
+the outputs `verdict`, `errors` and `report`, the path of the JSON report. Every input is
+in [action.yml](action.yml).
+
+- **The molde it runs is the release the action is pinned to** (`@v0.2.0`). Pinned to a
+  commit SHA, set `version: 0.2.0` too; `version: latest` asks for the newest on purpose.
+- **The report is treated as the pull request author's text:** everything from it is
+  escaped in the comment and the log, so a page title can't post an image, mention
+  someone or forge an annotation. The action edits only its own comment, never one
+  someone else wrote, and molde never sees the token.
+
 ## When not to use molde
 
 - **A blog or docs site written in Markdown.** molde renders data, not content files; Hugo,
