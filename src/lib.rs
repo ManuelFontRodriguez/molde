@@ -45,7 +45,7 @@ pub mod testing {
     pub use crate::check::titles::check_titles;
     pub use crate::render::{engine, page_url, render_page};
     pub use crate::routes::{expand_routes, is_valid_lastmod};
-    pub use crate::serve::{serve_response, site_fingerprint};
+    pub use crate::serve::{serve_response, serve_watching, site_fingerprint};
     pub use crate::site::load_site;
     pub use crate::store::{list_builds, lock_out, publish};
 

@@ -879,7 +879,10 @@ molde guide                            # docs/agents.md: a short guide to this r
 `routes` prints the JSON the MCP `list_routes` tool returns: per route its template,
 patterns, page count, noindex count and example paths, plus `total_pages`.
 
-`serve --watch` runs one verified check at startup, then polls the site dir
+`serve --watch` runs one verified check at startup, in the background: the last good
+build (`out/current`) is served meanwhile, and with no build yet every request gets a
+short "first build in progress" page (status 503) that reloads itself until one
+publishes, or says the check failed. Then it polls the site dir
 (dotfiles and the out dir excluded, so `--out` inside the site dir is safe) and
 reruns `check` when it settles. A failing check never publishes — the browser
 keeps the last good build. `--reload` (requires `--watch`) injects a polling
