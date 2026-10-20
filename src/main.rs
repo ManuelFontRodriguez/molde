@@ -260,7 +260,7 @@ fn main() -> Result<()> {
                 allow_project_root,
             };
             let report = molde::run_verify(&dir, &opts)?;
-            println!("{}", serde_json::to_string_pretty(&report)?);
+            stdout(&format!("{}\n", serde_json::to_string_pretty(&report)?));
             if report["verdict"] != "pass" {
                 std::process::exit(1);
             }
