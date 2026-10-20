@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    
+    <title>Realistic Hugo Site</title>
+    <meta name="viewport" content="width=device-width,minimum-scale=1">
+    <meta name="description" content="">
+    <meta name="generator" content="Hugo 0.168.0">
+    
+    
+    
+      <meta name="robots" content="index, follow">
+    
+    
+
+    <link rel="stylesheet" href="/repo/ananke/css/main.02a37ad6c4e155c542d276915a0e3f83f5c7c5fec443350f6e60753f1679b7a7.css" integrity="sha256-AqN61sThVcVC0naRWg4/g/XHxf7EQzUPbmB1PxZ5t6c=" crossorigin="anonymous">
+    <script>
+  (function () {
+    "use strict";
+
+    
+    
+    function revealButtons() {
+      var buttons = document.querySelectorAll(".code-block .code-copy[hidden]");
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].hidden = false;
+      }
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", revealButtons);
+    } else {
+      revealButtons();
+    }
+
+    function flash(button) {
+      var label = button.querySelector(".code-copy-label");
+      var previous = label ? label.textContent : null;
+      button.classList.add("is-copied");
+      if (label) label.textContent = "Copied";
+      window.setTimeout(function () {
+        button.classList.remove("is-copied");
+        if (label && previous !== null) label.textContent = previous;
+      }, 2000);
+    }
+
+    function legacyCopy(text) {
+      var area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "absolute";
+      area.style.left = "-9999px";
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try {
+        ok = document.execCommand("copy");
+      } catch (e) {
+        ok = false;
+      }
+      document.body.removeChild(area);
+      return ok;
+    }
+
+    function copyFrom(button) {
+      var container = button.closest(".code-block");
+      if (!container) return;
+      var pre = container.querySelector("pre");
+      if (!pre) return;
+      var source = pre.querySelector("code") || pre;
+      var text = source.innerText;
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          function () { flash(button); },
+          function () { if (legacyCopy(text)) flash(button); }
+        );
+      } else if (legacyCopy(text)) {
+        flash(button);
+      }
+    }
+
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest(".code-copy");
+      if (button) copyFrom(button);
+    });
+  })();
+</script>
+
+    
+      
+
+    
+
+    
+    
+      <link href="/repo/tags/web/index.xml" rel="alternate" type="application/rss+xml" title="Realistic Hugo Site" />
+      <link href="/repo/tags/web/index.xml" rel="feed" type="application/rss+xml" title="Realistic Hugo Site" />
+      
+    
+
+    
+      <link rel="canonical" href="https://user.github.io/repo/tags/web/">
+    
+
+    
+    
+    <meta property="og:url" content="https://user.github.io/repo/tags/web/">
+	<meta property="og:site_name" content="Realistic Hugo Site">
+	<meta property="og:title" content="Web">
+	<meta property="og:locale" content="en_us">
+	<meta property="og:type" content="website">
+
+	<meta itemprop="name" content="Web">
+	<meta itemprop="datePublished" content="2026-09-12T10:00:00+00:00">
+	<meta itemprop="dateModified" content="2026-09-12T10:00:00+00:00">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:title" content="Web">
+
+      
+      
+    
+	
+  </head><body class="ma0 avenir bg-near-white production is-term">
+
+  <header>
+    <div class="pb3-m pb6-l bg-black">
+      <nav class="pv3 ph3 ph4-ns" role="navigation">
+  <div class="flex-l center items-center justify-between">
+    <a href="/repo/" class="f3 fw2 hover-white white-90 dib no-underline">
+      
+        Realistic Hugo Site
+      
+    </a>
+    <div class="flex-l items-center">
+      
+
+      
+      <div class="ananke-socials"></div>
+
+    </div>
+  </div>
+</nav>
+
+      
+      <div class="tc-l pv3 ph3 ph4-ns">
+        <h1 class="f2 f-subheadline-l fw2 light-silver mb0 lh-title">
+          Web
+        </h1>
+        
+      </div>
+    </div>
+  </header>
+
+<main class="pb7" role="main">
+  
+  
+
+  <article class="pa3 pa4-ns nested-copy-line-height">
+    <section class="cf ph3 ph5-l pv3 pv4-l f4 tc-l center measure-wide lh-copy nested-links mid-gray"></section>
+    <section class="flex-ns mt5 flex-wrap justify-around">
+      
+        <div class="w-100 w-30-l mb4 relative bg-white">
+          
+<div class="w-100 mb4 nested-copy-line-height relative bg-white">
+  <div class="mb3 pa4 gray overflow-hidden bg-white">
+    <span class="f6 db">Posts</span>
+    
+      <time class="f6 db" datetime="2026-09-12T10:00:00Z">September 12, 2026</time>
+    
+    <h1 class="f3 near-black">
+      <a href="/repo/posts/post-12/" class="link black dim">
+        Post 12
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height">
+      <p>This is post 12, with a <a href="/posts/my-first-post/">link to the first post</a>.</p>
+    </div>
+    <a href="/repo/posts/post-12/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+  </div>
+</div>
+
+        </div>
+      
+        <div class="w-100 w-30-l mb4 relative bg-white">
+          
+<div class="w-100 mb4 nested-copy-line-height relative bg-white">
+  <div class="mb3 pa4 gray overflow-hidden bg-white">
+    <span class="f6 db">Posts</span>
+    
+      <time class="f6 db" datetime="2026-09-11T10:00:00Z">September 11, 2026</time>
+    
+    <h1 class="f3 near-black">
+      <a href="/repo/posts/post-11/" class="link black dim">
+        Post 11
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height">
+      <p>This is post 11, with a <a href="/posts/my-first-post/">link to the first post</a>.</p>
+    </div>
+    <a href="/repo/posts/post-11/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+  </div>
+</div>
+
+        </div>
+      
+        <div class="w-100 w-30-l mb4 relative bg-white">
+          
+<div class="w-100 mb4 nested-copy-line-height relative bg-white">
+  <div class="mb3 pa4 gray overflow-hidden bg-white">
+    <span class="f6 db">Posts</span>
+    
+      <time class="f6 db" datetime="2026-09-10T10:00:00Z">September 10, 2026</time>
+    
+    <h1 class="f3 near-black">
+      <a href="/repo/posts/post-10/" class="link black dim">
+        Post 10
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height">
+      <p>This is post 10, with a <a href="/posts/my-first-post/">link to the first post</a>.</p>
+    </div>
+    <a href="/repo/posts/post-10/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+  </div>
+</div>
+
+        </div>
+      
+        <div class="w-100 w-30-l mb4 relative bg-white">
+          
+<div class="w-100 mb4 nested-copy-line-height relative bg-white">
+  <div class="mb3 pa4 gray overflow-hidden bg-white">
+    <span class="f6 db">Posts</span>
+    
+      <time class="f6 db" datetime="2026-09-09T10:00:00Z">September 9, 2026</time>
+    
+    <h1 class="f3 near-black">
+      <a href="/repo/posts/post-09/" class="link black dim">
+        Post 09
+      </a>
+    </h1>
+    <div class="nested-links f5 lh-copy nested-copy-line-height">
+      <p>This is post 09, with a <a href="/posts/my-first-post/">link to the first post</a>.</p>
+    </div>
+    <a href="/repo/posts/post-09/" class="ba b--moon-gray bg-light-gray br2 color-inherit dib f7 hover-bg-moon-gray link mt2 ph2 pv1">read more</a>
+  </div>
+</div>
+
+        </div>
+      
+    </section>
+    
+		<ul class="pagination pagination-default">
+			<li class="page-item disabled">
+				<a aria-disabled="true" aria-label="First" class="page-link" role="button" tabindex="-1"><span aria-hidden="true">&laquo;&laquo;</span></a>
+			</li>
+		<li class="page-item disabled">
+			<a aria-disabled="true" aria-label="Previous" class="page-link" role="button" tabindex="-1"><span aria-hidden="true">&laquo;</span></a>
+		</li>
+			<li class="page-item active">
+				<a aria-current="page" aria-label="Page 1" class="page-link" role="button">1</a>
+			</li>
+			<li class="page-item">
+				<a href="/repo/tags/web/page/2/" aria-label="Page 2" class="page-link" role="button">2</a>
+			</li>
+			<li class="page-item">
+				<a href="/repo/tags/web/page/3/" aria-label="Page 3" class="page-link" role="button">3</a>
+			</li>
+		<li class="page-item">
+			<a href="/repo/tags/web/page/2/" aria-label="Next" class="page-link" role="button"><span aria-hidden="true">&raquo;</span></a>
+		</li>
+			<li class="page-item">
+				<a href="/repo/tags/web/page/3/" aria-label="Last" class="page-link" role="button"><span aria-hidden="true">&raquo;&raquo;</span></a>
+			</li>
+		</ul></article>
+</main><footer class="bg-black bottom-0 w-100 pa3" role="contentinfo">
+  <div class="flex justify-between">
+  <a class="f4 fw4 hover-white white-70 dn dib-ns pv2 ph3 no-underline" href="https://user.github.io/repo/" >
+    &copy;  Realistic Hugo Site 2026 
+  </a>
+    <div><div class="ananke-socials"></div>
+</div>
+  </div>
+</footer>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

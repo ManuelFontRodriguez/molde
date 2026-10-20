@@ -1,0 +1,7 @@
+baseURL = 'https://example.org/'
+locale = 'en-us'
+title = 'Realistic Hugo Site'
+theme = 'ananke'
+
+[pagination]
+  pagerSize = 4

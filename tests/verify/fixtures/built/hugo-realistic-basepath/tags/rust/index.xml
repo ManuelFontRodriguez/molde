@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+	<channel>
+		<title>Rust on Realistic Hugo Site</title>
+		<link>https://user.github.io/repo/tags/rust/</link>
+		<description>Recent content in Rust on Realistic Hugo Site</description>
+		<generator>Hugo</generator>
+		<language>en-us</language>
+		
+		
+		
+		
+			<lastBuildDate>Sat, 12 Sep 2026 10:00:00 +0000</lastBuildDate>
+		
+			<atom:link href="https://user.github.io/repo/tags/rust/index.xml" rel="self" type="application/rss+xml" />
+			<item>
+				<title>Post 12</title>
+				<link>https://user.github.io/repo/posts/post-12/</link>
+				<pubDate>Sat, 12 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://user.github.io/repo/posts/post-12/</guid>
+				<description>&lt;p&gt;This is post 12, with a &lt;a href=&#34;https://user.github.io/repo/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 09</title>
+				<link>https://user.github.io/repo/posts/post-09/</link>
+				<pubDate>Wed, 09 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://user.github.io/repo/posts/post-09/</guid>
+				<description>&lt;p&gt;This is post 09, with a &lt;a href=&#34;https://user.github.io/repo/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 06</title>
+				<link>https://user.github.io/repo/posts/post-06/</link>
+				<pubDate>Sun, 06 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://user.github.io/repo/posts/post-06/</guid>
+				<description>&lt;p&gt;This is post 06, with a &lt;a href=&#34;https://user.github.io/repo/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 03</title>
+				<link>https://user.github.io/repo/posts/post-03/</link>
+				<pubDate>Thu, 03 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://user.github.io/repo/posts/post-03/</guid>
+				<description>&lt;p&gt;This is post 03, with a &lt;a href=&#34;https://user.github.io/repo/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+	</channel>
+</rss>

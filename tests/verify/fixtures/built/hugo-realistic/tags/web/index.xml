@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+	<channel>
+		<title>Web on Realistic Hugo Site</title>
+		<link>https://example.org/tags/web/</link>
+		<description>Recent content in Web on Realistic Hugo Site</description>
+		<generator>Hugo</generator>
+		<language>en-us</language>
+		
+		
+		
+		
+			<lastBuildDate>Sat, 12 Sep 2026 10:00:00 +0000</lastBuildDate>
+		
+			<atom:link href="https://example.org/tags/web/index.xml" rel="self" type="application/rss+xml" />
+			<item>
+				<title>Post 12</title>
+				<link>https://example.org/posts/post-12/</link>
+				<pubDate>Sat, 12 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-12/</guid>
+				<description>&lt;p&gt;This is post 12, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 11</title>
+				<link>https://example.org/posts/post-11/</link>
+				<pubDate>Fri, 11 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-11/</guid>
+				<description>&lt;p&gt;This is post 11, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 10</title>
+				<link>https://example.org/posts/post-10/</link>
+				<pubDate>Thu, 10 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-10/</guid>
+				<description>&lt;p&gt;This is post 10, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 09</title>
+				<link>https://example.org/posts/post-09/</link>
+				<pubDate>Wed, 09 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-09/</guid>
+				<description>&lt;p&gt;This is post 09, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 08</title>
+				<link>https://example.org/posts/post-08/</link>
+				<pubDate>Tue, 08 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-08/</guid>
+				<description>&lt;p&gt;This is post 08, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 07</title>
+				<link>https://example.org/posts/post-07/</link>
+				<pubDate>Mon, 07 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-07/</guid>
+				<description>&lt;p&gt;This is post 07, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 06</title>
+				<link>https://example.org/posts/post-06/</link>
+				<pubDate>Sun, 06 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-06/</guid>
+				<description>&lt;p&gt;This is post 06, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 05</title>
+				<link>https://example.org/posts/post-05/</link>
+				<pubDate>Sat, 05 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-05/</guid>
+				<description>&lt;p&gt;This is post 05, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 04</title>
+				<link>https://example.org/posts/post-04/</link>
+				<pubDate>Fri, 04 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-04/</guid>
+				<description>&lt;p&gt;This is post 04, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 03</title>
+				<link>https://example.org/posts/post-03/</link>
+				<pubDate>Thu, 03 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-03/</guid>
+				<description>&lt;p&gt;This is post 03, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 02</title>
+				<link>https://example.org/posts/post-02/</link>
+				<pubDate>Wed, 02 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-02/</guid>
+				<description>&lt;p&gt;This is post 02, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+			<item>
+				<title>Post 01</title>
+				<link>https://example.org/posts/post-01/</link>
+				<pubDate>Tue, 01 Sep 2026 10:00:00 +0000</pubDate>
+				<guid>https://example.org/posts/post-01/</guid>
+				<description>&lt;p&gt;This is post 01, with a &lt;a href=&#34;https://example.org/posts/my-first-post/&#34;&gt;link to the first post&lt;/a&gt;.&lt;/p&gt;</description>
+			</item>
+	</channel>
+</rss>
