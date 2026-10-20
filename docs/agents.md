@@ -105,7 +105,12 @@ minijinja, the Rust Jinja2 dialect. In a template:
   escapes twice: `html.double_escaped`). Other outputs (`.json.j2`, `.txt.j2`) are plain
   text; build JSON with `tojson`.
 - **JSON-LD:** `<script type="application/ld+json">{{ {"@type": "Book", "name": item.title} | tojson }}</script>`.
-  `tojson` output is safe inside `<script>`.
+  `tojson` output is safe inside `<script>`, and it is how data enters an inline script:
+  `var x = {{ x | tojson }};`, never `"{{ x }}"`.
+- **No Python string methods:** `s.split(',')`, `s.startswith('a')` are errors; write
+  `s | split(',')`, `s is startingwith('a')`, `'a' in s`.
+- **A loop's `if` filter doesn't see the body's `namespace`:** test inside the body
+  (`{% for … %}{% if ns.n < 1 %}…{% endif %}{% endfor %}`).
 - **Missing fields render empty**, without an error (`{{ item.typo }}` is blank).
   `{{ missing.x }}` is an error. `null` prints as nothing; test it with `is none`.
 - **Sorting:** `sort(attribute="name")` ignores ASCII case; items whose field is `null`

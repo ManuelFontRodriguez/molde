@@ -529,7 +529,9 @@ CI run is the verdict on whether the upgrade changes anything.
 | `set` scope | a `set` inside `{% for %}` is local to the loop body: it neither leaks out nor changes an outer variable of the same name |
 | `include` | the included template sees the including template's full context: `set` variables and, inside a loop, the loop variable |
 | `import` / `from … import` | macros see the **importing** template's top-level context as it stood at the import, earlier `set`s included (Jinja2 imports "without context" by default). They do **not** see loop or `with` variables, nor a `set` after the import: pass such values as macro arguments |
-| Methods | no Python-style methods: `{{ s.upper() }}`, `{{ d.items() }}` are `unknown method` errors; use filters (`\| upper`, `\| items`) |
+| Methods | no Python-style methods: `{{ s.upper() }}`, `{{ d.items() }}`, `{{ s.split(',') }}`, `{{ s.startswith('a') }}` are `unknown method` errors; use filters and tests: `\| upper`, `\| items`, `\| split(',')`, `s is startingwith('a')` / `is endingwith`, `'a' in s` |
+| Loop filters | `{% for x in xs if cond %}` filters the whole list before the body runs: a `namespace` the body changes (`ns.n = ns.n + 1`) is not seen by `cond`. To stop after the first match, test inside the body: `{% for x in xs %}{% if ns.n < 1 %}…{% set ns.n = ns.n + 1 %}{% endif %}{% endfor %}` |
+| Inline `<script>` | pass data with `tojson`, unquoted: `var x = {{ x \| tojson }};` is a JS value that can't close the script. A quoted `"{{ x }}"` gets HTML escaping (`&lt;`), which JavaScript doesn't undo |
 | Not enabled | the `urlencode` filter, `{% break %}` / `{% continue %}`, Unicode case folding in `sort` / `dictsort` |
 
 ## JSON-LD
