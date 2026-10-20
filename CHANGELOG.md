@@ -7,6 +7,13 @@ of release may change is in the reference's
 
 ## Unreleased
 
+### Added
+
+- Templates get `page.title`, `page.description` and `page.index`: the page's rendered
+  title and description patterns (the strings `std_head` prints) and its `index` value,
+  so a template can add `twitter:title` or a tag only on indexable pages without
+  repeating the route's patterns. Nothing to do.
+
 ### Changed
 
 - `links.internal` compares file names exactly, case included, on every file system. On

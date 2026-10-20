@@ -179,3 +179,88 @@ fn html_autoescape_leaves_slashes_readable() {
     );
     assert!(html.ends_with("</a>1.5"), "{html}");
 }
+
+/// `page.title` / `page.description` / `page.index` (issue #12): a template adds tags
+/// derived from them (`twitter:title`, a tag only on indexable pages) without repeating
+/// the route's patterns. The strings are std_head's, escaped once like `og:title`.
+#[test]
+fn page_title_description_and_index_match_std_head() {
+    let data = serde_json::json!({
+        "books": [
+            { "slug": "dune", "name": HOSTILE, "listed": true },
+            { "slug": "draft", "name": "Draft", "listed": false }
+        ]
+    });
+    let dir = site(
+        "meta",
+        &data.to_string(),
+        "<html><head>{{ std_head }}\
+         <meta name=\"twitter:title\" content=\"{{ page.title }}\">\
+         <meta name=\"twitter:description\" content=\"{{ page.description }}\">\
+         {% if page.index %}<meta name=\"x-indexable\" content=\"yes\">{% endif %}\
+         </head><body></body></html>",
+    );
+    fs::write(
+        dir.join("routes.yaml"),
+        "routes:\n  - path: /{slug}/index.html\n    template: p.html.j2\n    foreach: books\n    \
+         title: \"{{ item.name }} review\"\n    description: \"  About {{ item.name }}.  \"\n    \
+         index: \"{{ item.listed }}\"\n",
+    )
+    .unwrap();
+    fs::write(dir.join("site.yaml"), "base_url: https://example.com/\n").unwrap();
+    let report = molde::build(&dir, &dir.join("out")).unwrap();
+    let html = fs::read_to_string(report.build_dir.join("dune/index.html")).unwrap();
+    let og = |prop: &str| {
+        let open = format!("<meta property=\"og:{prop}\" content=\"");
+        let start = html.find(&open).expect(&html) + open.len();
+        html[start..start + html[start..].find('"').unwrap()].to_string()
+    };
+    assert!(
+        html.contains(&format!(
+            "<meta name=\"twitter:title\" content=\"{}\">",
+            og("title")
+        )),
+        "{html}"
+    );
+    assert!(
+        html.contains(&format!(
+            "<meta name=\"twitter:description\" content=\"{}\">",
+            og("description")
+        )),
+        "{html}"
+    );
+    assert!(
+        og("title").starts_with("Pride &amp; Prejudice &lt;b&gt;"),
+        "{html}"
+    );
+    assert!(og("description").starts_with("About Pride"), "{html}");
+    assert!(
+        html.contains(r#"<meta name="x-indexable" content="yes">"#),
+        "{html}"
+    );
+    let draft = fs::read_to_string(report.build_dir.join("draft/index.html")).unwrap();
+    assert!(
+        draft.contains(r#"<meta name="twitter:title" content="Draft review">"#),
+        "{draft}"
+    );
+    assert!(!draft.contains("x-indexable"), "{draft}");
+
+    // without a base_url std_head prints nothing, and title/description are undefined
+    // (`is defined` and `default` work on them), not none
+    fs::remove_file(dir.join("site.yaml")).unwrap();
+    fs::write(
+        dir.join("templates/p.html.j2"),
+        "<html><head><meta name=\"twitter:title\" content=\"{{ page.title | default('fallback') }}\">\
+         {% if page.description is defined %}desc{% endif %}\
+         {% if page.index %}<meta name=\"x-indexable\" content=\"yes\">{% endif %}</head></html>",
+    )
+    .unwrap();
+    let report = molde::build(&dir, &dir.join("out2")).unwrap();
+    let html = fs::read_to_string(report.build_dir.join("dune/index.html")).unwrap();
+    assert!(
+        html.contains(r#"<meta name="twitter:title" content="fallback">"#),
+        "{html}"
+    );
+    assert!(!html.contains("desc"), "{html}");
+    assert!(html.contains("x-indexable"), "{html}");
+}
