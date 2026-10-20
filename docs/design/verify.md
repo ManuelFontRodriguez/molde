@@ -37,10 +37,13 @@ generator, verify names the page but not the template or content file that made 
 
 ## 2. Goals and non-goals
 
-**The release gate (Finding 1, Finding 2).** verify ships only when it reports **zero errors** on the
-official default starter of Hugo, Astro, Next.js (static export, `trailingSlash` on and
-off), Eleventy and Zola, plus one realistic configuration of each (§9). A verifier that
-fails a correct site on day one is uninstalled.
+**The release gate (Finding 1, Finding 2).** verify ships only when, on the official
+starter of Hugo, Astro, Next.js (static export, `trailingSlash` on and off), Eleventy and
+Zola, plus the realistic configurations (§9), it reports **exactly each fixture's recorded
+errors: none extra, none missing**. A recorded error is a genuine defect of the starter,
+with its reason (for example, Zola's tutorial gives every page the title "MyBlog"). A
+verifier that fails a correct site on day one is uninstalled; one that hides a real defect
+is worse.
 
 **Goals.**
 - `molde verify <dir>` checks a folder of built HTML and prints a report in `check`'s shape.
@@ -156,10 +159,11 @@ own CI, where the exit code is the gate.
 - **Fixtures, committed as built output** (built once, not in CI):
   - each generator's official starter, in its default configuration;
   - one realistic configuration each: Hugo with a theme, taxonomies, pagination and aliases; Next.js with `trailingSlash: false`; Astro with `build.format: 'file'`; a GitHub Pages build under a base path.
-- **Acceptance:** zero errors on every fixture with the flags its host needs (none, `--clean-urls`, the base path). Each fixture's README says which, and why.
+- **Acceptance:** on every fixture, with the flags its host needs (none, `--clean-urls`, the base path), exactly the errors its README records as genuine. `tests/verify/fixtures/README.md` lists both.
+- **The corpus** is in `tests/verify/fixtures/` (built 20 Oct 2026): Hugo's quickstart (Ananke), a realistic Hugo site plain and under a GitHub Pages base path, Eleventy's base blog, Astro's blog template, Next.js's static export with `trailingSlash` off and on, and Zola's getting-started blog.
 - **True positives:** each fixture copied with one planted defect per check, failing on exactly that one.
 - **molde's own sites:** verify on their output reports what `check` reports, apart from provenance.
-- **The prototype numbers of review 1** are the baseline v2 must improve on: 43, 30, 14, 2 and 2 errors, down to zero.
+- **The prototype numbers of review 1** are the baseline v2 must improve on: 43, 30, 14, 2 and 2 errors, down to the recorded genuine ones.
 
 ## 10. Effort and order
 
