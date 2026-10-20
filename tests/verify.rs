@@ -705,3 +705,160 @@ fn refusals_say_where_to_look() {
     }
     let _ = fs::remove_dir_all(&root);
 }
+
+/// What the review of the verify branch found, each planted in a copy of a real build.
+#[test]
+fn branch_review_cases() {
+    let o = || opts(BASE);
+    let page = |canonical: &str| {
+        format!("<!doctype html><html><head><title>T{canonical}</title><link rel=\"canonical\" href=\"{canonical}\"></head><body>x</body></html>")
+    };
+    let cases: Vec<Case> = vec![
+        // every canonical hard-coded to the home page: one error, not five silent aliases
+        (
+            "shared-canonical",
+            Box::new(move |d| {
+                for i in 0..5 {
+                    fs::create_dir_all(d.join(format!("s{i}"))).unwrap();
+                    fs::write(
+                        d.join(format!("s{i}/index.html")),
+                        page("https://example.org/"),
+                    )
+                    .unwrap();
+                }
+            }),
+            o(),
+            &[("canonical.shared", 1)],
+        ),
+        // a bare refresh stub needs no title
+        (
+            "refresh-stub",
+            Box::new(|d| {
+                fs::write(
+                    d.join("go.html"),
+                    "<!doctype html><meta http-equiv=\"refresh\" content=\"0; url=/posts/\">",
+                )
+                .unwrap()
+            }),
+            o(),
+            &[],
+        ),
+        // a <noscript> refresh doesn't make a content page a redirect: its title is checked
+        (
+            "noscript-refresh",
+            Box::new(|d| {
+                fs::write(d.join("app.html"),
+                "<!doctype html><html><head><noscript><meta http-equiv=\"refresh\" content=\"0; url=/posts/\"></noscript></head><body>x</body></html>").unwrap()
+            }),
+            o(),
+            &[("titles.missing", 1)],
+        ),
+        // <base href="#"> is no base: a broken relative link is still found
+        (
+            "base-fragment",
+            Box::new(|d| edit(d, POST, "</head>", "<base href=\"#\"></head>")),
+            o(),
+            &[],
+        ),
+        (
+            "base-fragment-broken",
+            Box::new(|d| {
+                edit(
+                    d,
+                    POST,
+                    "</body>",
+                    "<base href=\"#\"><a href=\"gone/\">x</a></body>",
+                )
+            }),
+            o(),
+            &[("links.internal", 1)],
+        ),
+        // a Sitemap line on another host isn't the build's to judge
+        (
+            "robots-cdn-sitemap",
+            Box::new(|d| {
+                fs::write(
+                    d.join("robots.txt"),
+                    "Sitemap: https://cdn.example/sitemap.xml\n",
+                )
+                .unwrap()
+            }),
+            o(),
+            &[],
+        ),
+    ];
+    for (tag, plant, opts, want) in cases {
+        assert_eq!(planted(tag, plant, opts), map(want), "{tag}");
+    }
+}
+
+/// A symlinked file or folder inside the build is served; one leaving the build is not.
+#[cfg(unix)]
+#[test]
+fn symlinks_inside_the_build_are_files() {
+    let dir = copy("hugo-realistic", "symlinks");
+    std::os::unix::fs::symlink(dir.join("posts"), dir.join("articles")).unwrap();
+    std::os::unix::fs::symlink(dir.join("index.html"), dir.join("home.html")).unwrap();
+    std::os::unix::fs::symlink("/", dir.join("outside")).unwrap();
+    edit(&dir, POST, "</body>", "<a href=\"/articles/\">a</a><a href=\"/home.html\">h</a><a href=\"/outside/etc/hosts\">o</a></body>");
+    let r = molde::run_verify(&dir, &opts(BASE)).unwrap();
+    let broken: Vec<&str> = r["errors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|e| e["broken_href"].as_str())
+        .collect();
+    // (through `articles/` the post exists twice, so its one broken link is found twice)
+    assert!(
+        !broken.is_empty() && broken.iter().all(|b| *b == "/outside/etc/hosts"),
+        "{:#}",
+        r["errors"]
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// The base path compares decoded; and with a wrong --base-url, a sitemap entry that is
+/// wrong under both addresses is kept alone, not with the wrong address's other entries.
+#[test]
+fn encoded_base_paths_and_mismatch_keys() {
+    let r = molde::run_verify(
+        &fixture("hugo-realistic-basepath"),
+        &opts("https://user.github.io/re%70o/"),
+    )
+    .unwrap();
+    assert_eq!(
+        errors(&r),
+        map(&[("links.outside_base", 1)]),
+        "{:#}",
+        r["errors"]
+    );
+    let dir = copy("hugo-realistic", "mismatch-loc");
+    edit(
+        &dir,
+        "sitemap.xml",
+        "</urlset>",
+        "<url><loc>https://example.org/gone/</loc></url></urlset>",
+    );
+    let r = molde::run_verify(&dir, &opts("https://example.com/")).unwrap();
+    let dangling = r["errors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["check"] == "sitemap.dangling")
+        .count();
+    assert!(dangling <= 1, "{:#}", r["errors"]);
+    // a published repository root: refused, unless asked
+    fs::write(dir.join("package.json"), "{}").unwrap();
+    assert_eq!(
+        errors(&molde::run_verify(&dir, &opts(BASE)).unwrap()),
+        map(&[("verify.project_root", 1)])
+    );
+    let allowed = molde::VerifyOptions {
+        allow_project_root: true,
+        ..opts(BASE)
+    };
+    assert!(
+        !errors(&molde::run_verify(&dir, &allowed).unwrap()).contains_key("verify.project_root")
+    );
+    let _ = fs::remove_dir_all(&dir);
+}

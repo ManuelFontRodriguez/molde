@@ -31,9 +31,12 @@ impl Address {
         if host.contains(['?', '#', '@']) || path.contains(['?', '#']) {
             return None;
         }
+        // links are compared decoded (`resolve` decodes each segment), so the base is too:
+        // `/caf%C3%A9/` and `/café/` are one base path
+        let path: Vec<String> = path.split('/').map(percent_decode).collect();
         Some(Self {
             origin: format!("{}{}", &lower[..scheme_end], host.to_ascii_lowercase()),
-            base: format!("{path}/"),
+            base: format!("{}/", path.join("/")),
         })
     }
 
@@ -272,6 +275,10 @@ mod tests {
             assert!(Address::parse(bad).is_none(), "{bad}");
         }
         assert_eq!(a.url_of("/x/"), "https://user.github.io/repo/x/");
+        assert_eq!(
+            Address::parse("https://x.example/caf%C3%A9/").unwrap().base,
+            "/café/"
+        );
     }
 
     #[test]

@@ -51,9 +51,23 @@ pub(crate) fn html_files(dir: &Path) -> Result<Vec<String>> {
 
 /// Every file under `dir`, sorted, `/`-separated. Symlinks are not followed out of `dir`.
 pub(crate) fn all_files(dir: &Path) -> Result<Vec<String>> {
+    // a symlink is followed when it stays inside the build: hosts serve the file it
+    // names (a deploy uploads it). One that leaves the build is not descended into or
+    // listed, and a loop ends the walk of that branch. Only symlinks are resolved.
+    let root = dir.canonicalize()?;
+    let inside = |e: &walkdir::DirEntry| {
+        !e.path_is_symlink()
+            || e.path()
+                .canonicalize()
+                .is_ok_and(|real| real.starts_with(&root))
+    };
     let mut files = Vec::new();
-    for entry in walkdir::WalkDir::new(dir).follow_links(false) {
-        let entry = entry?;
+    for entry in walkdir::WalkDir::new(dir)
+        .follow_links(true)
+        .into_iter()
+        .filter_entry(inside)
+    {
+        let Ok(entry) = entry else { continue };
         if entry.file_type().is_file() {
             let rel: PathBuf = entry.path().strip_prefix(dir)?.to_path_buf();
             files.push(rel.to_string_lossy().replace('\\', "/"));
@@ -106,7 +120,10 @@ impl LinkCtx<'_> {
                     Some(Some(folder(format!("{base}{p}"))))
                 }
                 Target::OutsideBase(p) => Some(Some(folder(p))),
-                Target::Elsewhere if !b.trim().is_empty() => Some(None),
+                // `#top` or `?q` only: the page's own address, so no move at all
+                Target::Elsewhere if !b.trim().is_empty() && !b.trim().starts_with(['#', '?']) => {
+                    Some(None)
+                }
                 _ => None,
             }
         });
@@ -220,7 +237,13 @@ fn facts(rel: &str, raw: &str, ctx: &LinkCtx) -> PageFacts {
     let mut titles = title_re.captures_iter(&titled);
     let first_title = titles.next().map(|c| unescape_entities(c[1].trim()));
     let title_count = usize::from(first_title.is_some()) + titles.count();
-    let refresh = meta_tag_re().find_iter(&markup).find_map(|m| {
+    // a refresh inside <noscript> is a fallback for readers without JavaScript, not
+    // what the page is
+    static NOSCRIPT: OnceLock<regex::Regex> = OnceLock::new();
+    let noscript =
+        NOSCRIPT.get_or_init(|| regex::Regex::new(r"(?is)<noscript\b.*?</noscript\s*>").unwrap());
+    let scripted = noscript.replace_all(&markup, "");
+    let refresh = meta_tag_re().find_iter(&scripted).find_map(|m| {
         let tag = m.as_str();
         let mut is_refresh = false;
         let mut content = None;

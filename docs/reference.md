@@ -784,6 +784,7 @@ molde verify out --base-url https://user.github.io/repo/ --clean-urls
 | `--og` | require the Open Graph block (`og.missing`) and an og:title that agrees with the title (`og.title_mismatch`) |
 | `--sitemap-complete` | an indexable page missing from the sitemap is an error, not a warning |
 | `--unique` | duplicate titles and descriptions are errors, not warnings, except where a pager or taxonomy page is involved |
+| `--allow-project-root` | verify the folder even though it holds a project file (`package.json`, `hugo.toml`, …): a repository published as is |
 
 **What a file is.** Every `.html` and `.htm` file, in any case, is one of the following,
 and each check judges it by that:
@@ -792,7 +793,7 @@ and each check judges it by that:
 |---|---|---|
 | `not_document` | no `<html`, `<head` or doctype in its first 2 KB, after a byte-order mark and leading comments (a verification file, a fragment) | nothing |
 | `not_found` | `404.html`, `404/index.html`, `_not-found.html`, `_not-found/index.html` at any depth (a locale's own `fr/404.html`); the root `200.html` and `__spa-fallback.html`; the `--spa-fallback` file unless it is the root `index.html` | its links only, `rel=alternate` links aside (no one reads a 404's head) |
-| `redirect` | a meta refresh with a URL (read as the HTML spec reads `content`: `0;url=…`, `0, URL = '…'`, `0;…`), or a canonical to another page of the build (an alias, a pager; an absolute canonical counts only with `--base-url`) | its links and its target |
+| `redirect` | a meta refresh with a URL (read as the HTML spec reads `content`: `0;url=…`, `0, URL = '…'`, `0;…`; not one inside `<noscript>`), or a canonical to another page of the build (an alias, a pager; an absolute canonical counts only with `--base-url`) | a refresh stub: its links and its target. A page with a canonical elsewhere: also one title, escaping, JSON-LD; and many such pages naming one page is `canonical.shared` |
 | `noindex` | a robots noindex meta | links and `titles.multiple` (a title isn't required: a frame's content, mdBook's `toc.html`); kept out of the sitemap and of uniqueness |
 | `indexable` | everything else | every check |
 
@@ -814,12 +815,13 @@ The report's `pages` counts each kind.
 | `canonical.target_missing` | with `--base-url` | the canonical names a page this build doesn't have |
 | `canonical.target_noindex` | with `--base-url`, and on redirects always | the canonical names a page that asks not to be indexed |
 | `canonical.missing` | with `--require-canonical` | an indexable page has none |
+| `canonical.shared` | always (absolute canonicals with `--base-url`) | three or more pages (pagers and taxonomy pages aside) name one other page as their canonical, usually a canonical hard-coded in a template: one error (`target`, `count`, `examples`). One page naming another can't be told from an alias, and passes |
 | `redirect.target_missing` | always (an absolute target with `--base-url`) | a meta refresh or an alias leads to a page this build doesn't have |
 | `sitemap.dangling`, `sitemap.noindex_listed` | with a sitemap | as in `check` |
 | `sitemap.non_canonical_listed` | with a sitemap | the sitemap lists a redirect: list the page it points to |
 | `sitemap.missing_page` | with a sitemap | a warning; an error with `--sitemap-complete` |
 | `sitemap.not_found` | with `--base-url` | a warning: no sitemap found |
-| `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a `robots.txt` | robots.txt names a sitemap the build doesn't have (an error), or has no `Sitemap:` line while the build has a sitemap (a warning: valid, and Hugo's default) / shuts every crawler out of a site with pages to index |
+| `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a `robots.txt` | robots.txt names a sitemap on this site that the build doesn't have (an error; one on another host isn't judged), or has no `Sitemap:` line while the build has a sitemap (a warning: valid, and Hugo's default) / shuts every crawler out of a site with pages to index |
 | `og.missing`, `og.title_mismatch` | with `--og` | |
 | `verify.base_url_mismatch` | with `--base-url`, or without it when the pages claim a base path | the pages claim another address (their canonicals' host and base path), and it explains most of the errors: one error naming it (`found`; `given` is null without `--base-url`), plus the errors and warnings that remain under both addresses |
 | `verify.no_pages` | always | the folder has no HTML documents (an empty build) |
@@ -843,7 +845,10 @@ S3 REST origin returns 403 for `/a`, and serves `/a/` only with a rewrite), `/a`
 `a.html` only with `--clean-urls`, file names exactly (`%2F` is part of a name, not a
 `/`). `<base href>` moves relative links: to a folder of this site, or out of verify's
 reach (another host, or an absolute base without `--base-url`), where they are not
-judged; the first `<base>` with an `href` counts, as in browsers.
+judged; the first `<base>` with an `href` counts, as in browsers, and a base that is only
+a `#fragment` or `?query` moves nothing. The base path is compared decoded
+(`/caf%C3%A9/` is `/café/`). A symlink inside the build is served as the file it names;
+one that leaves the build is not part of it.
 
 **Where verify's report differs from check's**, for a script that reads both: `build` is
 `{dir, files, ms}` (pages are counted by kind in `pages`), or `null` when verify refused

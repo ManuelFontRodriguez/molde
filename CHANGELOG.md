@@ -23,7 +23,7 @@ of release may change is in the reference's
     aliases, noindex pages), and one URL model handles base paths, clean URLs and
     `<base href>`.
   - **New check ids:** `links.outside_base`, `links.clean_urls`, `canonical.off_host`,
-    `canonical.target_missing`, `canonical.target_noindex`, `redirect.target_missing`,
+    `canonical.target_missing`, `canonical.target_noindex`, `canonical.shared`, `redirect.target_missing`,
     `sitemap.non_canonical_listed`, `sitemap.not_found`, `verify.base_url_mismatch`,
     `verify.no_pages` and `verify.project_root`.
   - **Release gate:** each generator's official starter, committed in

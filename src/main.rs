@@ -121,6 +121,10 @@ enum Cmd {
         /// Duplicate titles and descriptions are errors, not warnings (list pages excepted).
         #[arg(long)]
         unique: bool,
+        /// Verify the folder even though it holds a project file (package.json, hugo.toml):
+        /// a repository published as is.
+        #[arg(long)]
+        allow_project_root: bool,
     },
     /// Print a short guide to molde for agents and people: the site layout, routes.yaml,
     /// templates, the check report and the commands (docs/agents.md).
@@ -232,6 +236,7 @@ fn main() -> Result<()> {
             og,
             sitemap_complete,
             unique,
+            allow_project_root,
         } => {
             if let Some(msg) = spa_fallback
                 .as_deref()
@@ -251,6 +256,7 @@ fn main() -> Result<()> {
                 og,
                 sitemap_complete,
                 unique,
+                allow_project_root,
             };
             let report = molde::run_verify(&dir, &opts)?;
             println!("{}", serde_json::to_string_pretty(&report)?);

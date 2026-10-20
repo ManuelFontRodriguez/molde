@@ -27,6 +27,9 @@ pub struct VerifyOptions {
     /// Duplicate titles and descriptions among indexable pages are errors (except on
     /// list pages), not warnings.
     pub unique: bool,
+    /// Verify the folder even when it holds a project file (package.json, hugo.toml…):
+    /// a repository root published as is.
+    pub allow_project_root: bool,
 }
 
 /// What a file of the build is (§4). Every check asks this first.
@@ -112,7 +115,7 @@ pub fn spa_fallback_error(dir: &Path, fallback: &str) -> Option<String> {
 
 pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
     let started = std::time::Instant::now();
-    if let Some(stop) = refusal(dir) {
+    if let Some(stop) = refusal(dir, opts.allow_project_root) {
         // stopped before reading anything, as check's stops: `build` is null
         let mut r = finish(dir, started, json!({}), 0, vec![stop], vec![], vec![]);
         r["build"] = Value::Null;
@@ -195,7 +198,13 @@ pub fn run_verify(dir: &Path, opts: &VerifyOptions) -> Result<Value> {
                 &ignore,
             )?;
             if other.errors.len() * 2 < run.errors.len() {
-                let key = |e: &Value| format!("{}|{}|{}", e["check"], e["page"], e["broken_href"]);
+                // what makes an error itself: a sitemap entry has a loc, not a page
+                let key = |e: &Value| {
+                    format!(
+                        "{}|{}|{}|{}|{}|{}",
+                        e["check"], e["page"], e["broken_href"], e["loc"], e["found"], e["target"]
+                    )
+                };
                 let in_both: BTreeSet<String> = other.errors.iter().map(key).collect();
                 let mut errors = vec![
                     json!({"layer": "output", "check": "verify.base_url_mismatch",
@@ -274,6 +283,8 @@ fn judge(
     run.warnings.extend(w);
     run.errors.extend(page_content(facts, &kinds));
     run.errors
+        .extend(shared_canonicals(facts, &kinds, site, files));
+    run.errors
         .extend(redirects(facts, &kinds, site, files, &kind_of, &ignored));
     if let Some(site) = site {
         run.errors.extend(canonicals(
@@ -313,12 +324,15 @@ fn finish(
 }
 
 /// A folder verify must not judge: missing, or a project root rather than its output.
-fn refusal(dir: &Path) -> Option<Value> {
+fn refusal(dir: &Path, allow_project_root: bool) -> Option<Value> {
     if !dir.is_dir() {
         return Some(
             json!({"layer": "output", "check": "verify.no_pages", "dir": dir.display().to_string(),
                            "message": "not a folder"}),
         );
+    }
+    if allow_project_root {
+        return None;
     }
     let marker = PROJECT_MARKERS
         .iter()
@@ -692,6 +706,11 @@ fn page_content(facts: &[PageFacts], kinds: &[Kind]) -> Vec<Value> {
         if !k.is_document() || *k == Kind::NotFound {
             continue;
         }
+        // a meta refresh stub is held to its links and its target, like a not-found page:
+        // generators write it bare (`<meta http-equiv=refresh>` and nothing else)
+        if *k == Kind::Redirect && f.refresh.is_some() {
+            continue;
+        }
         // a noindex page is no one's search result: a frame's content (mdBook's toc.html)
         // or a print view may go without a title
         if f.title.is_empty() && *k != Kind::Noindex {
@@ -765,6 +784,41 @@ fn redirects(
         }
     }
     errors
+}
+
+/// Pages that name another page as canonical are taken for aliases and judged by their
+/// target only, which is right for one alias and hides a template bug: many pages naming
+/// one page (every canonical hard-coded to the home page) is one `canonical.shared`
+/// error. Pager and taxonomy pages that name their first page are a known pattern, and
+/// don't count. A single wrong canonical to an existing page can't be told from an alias.
+fn shared_canonicals(
+    facts: &[PageFacts],
+    kinds: &[Kind],
+    site: Option<&Address>,
+    files: &Files,
+) -> Vec<Value> {
+    let mut by_target: BTreeMap<String, Vec<&str>> = BTreeMap::new();
+    for (f, k) in facts.iter().zip(kinds) {
+        if *k != Kind::Redirect || f.refresh.is_some() || is_list_page(&f.rel) {
+            continue;
+        }
+        let Some(canonical) = f.canonicals.first() else {
+            continue;
+        };
+        if let Target::Site(p) = url::resolve(canonical, &url::page_dir(&f.rel, site), None, site) {
+            if let Some(file) = files.file_for(&p) {
+                by_target.entry(file).or_default().push(&f.rel);
+            }
+        }
+    }
+    by_target
+        .into_iter()
+        .filter(|(_, pages)| pages.len() >= 3)
+        .map(|(target, pages)| {
+            json!({"layer": "output", "check": "canonical.shared", "target": target,
+                   "page": pages[0], "count": pages.len(), "examples": pages.iter().take(5).collect::<Vec<_>>()})
+        })
+        .collect()
 }
 
 /// The canonicals of pages that aren't redirects, judged (§5): off the site, to a missing
@@ -860,7 +914,14 @@ fn sitemap(
         // a Sitemap line naming nothing in the build is an error; no Sitemap line at all,
         // next to a sitemap, is valid (crawlers also take it from a search console, and
         // Hugo's and Docsy's default robots.txt has none): a warning
-        if !names_one && (!named.is_empty() || entry.is_some()) {
+        // a Sitemap line on another host (a sitemap kept on a CDN) is not this build's
+        let named_here = named.iter().any(|u| {
+            matches!(
+                url::resolve(u, &site.base, None, Some(site)),
+                Target::Site(_)
+            )
+        });
+        if !names_one && (named_here || named.is_empty() && entry.is_some()) {
             let e = json!({"layer": "output", "check": "robots.sitemap_missing", "file": "robots.txt",
                            "expected": entry.as_ref().map(|e| site.url_of(&format!("/{e}"))), "found": named});
             if named.is_empty() {
@@ -1020,7 +1081,8 @@ fn hint(check: &str) -> Option<&'static str> {
         "redirect.target_missing" => "a redirect (meta refresh or alias) leads to a page this build doesn't have",
         "sitemap.dangling" => "the sitemap lists a URL with no file behind it",
         "sitemap.noindex_listed" => "the sitemap lists a page that asks not to be indexed",
-        "sitemap.non_canonical_listed" => "the sitemap lists a page whose canonical is another page: list the canonical one",
+        "sitemap.non_canonical_listed" => "the sitemap lists a page whose canonical names another page: list that page instead, or, if this page should be indexed on its own, fix its canonical",
+        "canonical.shared" => "many pages name one page as their canonical, so search engines index only that one: usually a canonical hard-coded in a template; each page should name itself",
         "sitemap.missing_page" => "an indexable page the sitemap doesn't list (a warning unless --sitemap-complete)",
         "sitemap.not_found" => "no sitemap in the build (robots.txt names none, and there is no sitemap.xml or sitemap-index.xml)",
         "robots.sitemap_missing" => "robots.txt names a sitemap the build doesn't have (an error), or names none while the build has one (a warning: add a `Sitemap:` line so every crawler finds it)",
@@ -1029,7 +1091,7 @@ fn hint(check: &str) -> Option<&'static str> {
         "og.title_mismatch" => "og:title and <title> say different things",
         "verify.no_pages" => "no HTML documents in this folder: is the build empty, or is this the wrong folder?",
         "verify.base_url_mismatch" => "the site's own canonicals use another address than --base-url (or a base path, and no --base-url was given): pass the address in `found` (or rebuild the site for the one you gave)",
-        "verify.project_root" => "this is the project's folder: run verify on its build output",
+        "verify.project_root" => "this is the project's folder: run verify on its build output (or, for a repository published as is, pass --allow-project-root)",
         _ => return None,
     })
 }
