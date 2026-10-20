@@ -295,7 +295,13 @@ fn each_check_catches_its_own_defect_in_a_real_build() {
         ),
         (
             "robots-sitemap",
-            Box::new(|d| fs::write(d.join("robots.txt"), "User-agent: *\nAllow: /\n").unwrap()),
+            Box::new(|d| {
+                fs::write(
+                    d.join("robots.txt"),
+                    "User-agent: *\nAllow: /\nSitemap: https://example.org/gone.xml\n",
+                )
+                .unwrap()
+            }),
             &[("robots.sitemap_missing", 1)],
         ),
         // post 5's canonical hands its ranking to post 6, which asks not to be indexed
@@ -513,12 +519,13 @@ fn held_out_review_cases() {
             o(),
             &[],
         ),
-        // ...but a sitemap it doesn't name, or a named one that isn't there, is an error
+        // ...and next to a sitemap it is a warning (Hugo's and Docsy's default); a named
+        // sitemap that isn't there is an error
         (
             "robots-unnamed-sitemap",
             Box::new(|d| fs::write(d.join("robots.txt"), "User-agent: *\nDisallow:\n").unwrap()),
             o(),
-            &[("robots.sitemap_missing", 1)],
+            &[],
         ),
         (
             "robots-named-elsewhere",
@@ -563,6 +570,33 @@ fn held_out_review_cases() {
             o(),
             &[],
         ),
+        // round 2: a noindex frame document (mdBook's toc.html) needs no title
+        (
+            "noindex-untitled",
+            Box::new(|d| {
+                fs::write(
+                    d.join("toc.html"),
+                    "<!doctype html><html><head>\
+                <meta name=\"robots\" content=\"noindex\"></head><body></body></html>",
+                )
+                .unwrap()
+            }),
+            o(),
+            &[],
+        ),
+        // round 2: the --spa-fallback file is a bare shell (React Router's)
+        (
+            "spa-fallback-shell",
+            Box::new(|d| {
+                fs::write(
+                    d.join("__spa-fallback.html"),
+                    "<!doctype html><html><head></head><body><div id=\"root\"></div></body></html>",
+                )
+                .unwrap()
+            }),
+            o(),
+            &[],
+        ),
         // a non-ASCII relative link used to panic
         (
             "non-ascii",
@@ -574,6 +608,32 @@ fn held_out_review_cases() {
     for (tag, plant, opts, want) in cases {
         assert_eq!(planted(tag, plant, opts), map(want), "{tag}");
     }
+    // the unnamed sitemap is still said, as a warning
+    let dir = copy("hugo-realistic", "robots-warning");
+    fs::write(dir.join("robots.txt"), "User-agent: *\n").unwrap();
+    let r = molde::run_verify(&dir, &opts(BASE)).unwrap();
+    assert_eq!(
+        ids(&r, "warnings").get("robots.sitemap_missing"),
+        Some(&1),
+        "{r:#}"
+    );
+    // and a fallback named by the flag is a not-found page too
+    fs::write(
+        dir.join("app.html"),
+        "<!doctype html><html><head></head></html>",
+    )
+    .unwrap();
+    let spa = molde::VerifyOptions {
+        spa_fallback: Some("/app.html".into()),
+        ..opts(BASE)
+    };
+    let r = molde::run_verify(&dir, &spa).unwrap();
+    assert!(
+        !errors(&r).contains_key("titles.missing"),
+        "{:#}",
+        r["errors"]
+    );
+    let _ = fs::remove_dir_all(&dir);
 }
 
 /// A shared value (a theme's default description) is one warning, not one per page.

@@ -255,7 +255,7 @@ fn judge(
     ignore: &[regex::Regex],
 ) -> Result<Run> {
     let ignored = |site_path: &str| ignore.iter().any(|re| re.is_match(site_path));
-    let kinds = classify(facts, site, files);
+    let kinds = classify(facts, site, files, opts.spa_fallback.as_deref());
     let kind_of: BTreeMap<&str, Kind> = facts
         .iter()
         .zip(&kinds)
@@ -335,14 +335,25 @@ fn refusal(dir: &Path) -> Option<Value> {
     })
 }
 
-fn classify(facts: &[PageFacts], site: Option<&Address>, files: &Files) -> Vec<Kind> {
+fn classify(
+    facts: &[PageFacts],
+    site: Option<&Address>,
+    files: &Files,
+    spa_fallback: Option<&str>,
+) -> Vec<Kind> {
+    // the --spa-fallback file is what the host serves for unknown paths: a not-found
+    // page by role, often a bare shell with no title. Not the root index.html, the
+    // usual fallback, which is the home page too
+    let fallback = spa_fallback
+        .map(|f| f.trim_start_matches('/').to_ascii_lowercase())
+        .filter(|f| f != "index.html");
     facts
         .iter()
         .map(|f| {
             let rel = f.rel.to_ascii_lowercase();
             if !f.is_document {
                 Kind::NotDocument
-            } else if is_not_found_page(&rel) {
+            } else if is_not_found_page(&rel) || fallback.as_deref() == Some(rel.as_str()) {
                 Kind::NotFound
             } else if f.refresh.is_some() || canonical_elsewhere(f, site, files) {
                 Kind::Redirect
@@ -365,6 +376,7 @@ pub(crate) fn is_not_found_page(rel: &str) -> bool {
         || name("_not-found.html")
         || name("_not-found/index.html")
         || rel == "200.html"
+        || rel == "__spa-fallback.html"
 }
 
 /// Does the page's canonical name another file of this build (an alias, a pager)?
@@ -680,7 +692,9 @@ fn page_content(facts: &[PageFacts], kinds: &[Kind]) -> Vec<Value> {
         if !k.is_document() || *k == Kind::NotFound {
             continue;
         }
-        if f.title.is_empty() {
+        // a noindex page is no one's search result: a frame's content (mdBook's toc.html)
+        // or a print view may go without a title
+        if f.title.is_empty() && *k != Kind::Noindex {
             errors.push(json!({"layer": "output", "check": "titles.missing", "page": f.rel}));
         }
         if f.title_count > 1 {
@@ -843,9 +857,17 @@ fn sitemap(
     let indexable = kinds.contains(&Kind::Indexable);
     if robots_text.is_some() {
         let names_one = named.iter().any(|u| file_of_url(u).is_some());
+        // a Sitemap line naming nothing in the build is an error; no Sitemap line at all,
+        // next to a sitemap, is valid (crawlers also take it from a search console, and
+        // Hugo's and Docsy's default robots.txt has none): a warning
         if !names_one && (!named.is_empty() || entry.is_some()) {
-            errors.push(json!({"layer": "output", "check": "robots.sitemap_missing", "file": "robots.txt",
-                               "expected": entry.as_ref().map(|e| site.url_of(&format!("/{e}"))), "found": named}));
+            let e = json!({"layer": "output", "check": "robots.sitemap_missing", "file": "robots.txt",
+                           "expected": entry.as_ref().map(|e| site.url_of(&format!("/{e}"))), "found": named});
+            if named.is_empty() {
+                warnings.push(e);
+            } else {
+                errors.push(e);
+            }
         }
         if indexable && robots::blocks_everyone(&robots_lines) {
             errors.push(
@@ -1001,7 +1023,7 @@ fn hint(check: &str) -> Option<&'static str> {
         "sitemap.non_canonical_listed" => "the sitemap lists a page whose canonical is another page: list the canonical one",
         "sitemap.missing_page" => "an indexable page the sitemap doesn't list (a warning unless --sitemap-complete)",
         "sitemap.not_found" => "no sitemap in the build (robots.txt names none, and there is no sitemap.xml or sitemap-index.xml)",
-        "robots.sitemap_missing" => "the build has a sitemap that robots.txt doesn't name, or robots.txt names one the build doesn't have",
+        "robots.sitemap_missing" => "robots.txt names a sitemap the build doesn't have (an error), or names none while the build has one (a warning: add a `Sitemap:` line so every crawler finds it)",
         "robots.blocks_all" => "robots.txt shuts every crawler out while the site has pages to index",
         "og.missing" => "the page lacks part of the Open Graph block (required by --og)",
         "og.title_mismatch" => "og:title and <title> say different things",

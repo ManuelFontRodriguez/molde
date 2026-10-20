@@ -791,9 +791,9 @@ and each check judges it by that:
 | Kind | Recognised by | Held to |
 |---|---|---|
 | `not_document` | no `<html`, `<head` or doctype in its first 2 KB, after a byte-order mark and leading comments (a verification file, a fragment) | nothing |
-| `not_found` | `404.html`, `404/index.html`, `_not-found.html`, `_not-found/index.html` at any depth (a locale's own `fr/404.html`), and the root `200.html` | its links only, `rel=alternate` links aside (no one reads a 404's head) |
+| `not_found` | `404.html`, `404/index.html`, `_not-found.html`, `_not-found/index.html` at any depth (a locale's own `fr/404.html`); the root `200.html` and `__spa-fallback.html`; the `--spa-fallback` file unless it is the root `index.html` | its links only, `rel=alternate` links aside (no one reads a 404's head) |
 | `redirect` | a meta refresh with a URL (read as the HTML spec reads `content`: `0;url=…`, `0, URL = '…'`, `0;…`), or a canonical to another page of the build (an alias, a pager; an absolute canonical counts only with `--base-url`) | its links and its target |
-| `noindex` | a robots noindex meta | links and titles; kept out of the sitemap and of uniqueness |
+| `noindex` | a robots noindex meta | links and `titles.multiple` (a title isn't required: a frame's content, mdBook's `toc.html`); kept out of the sitemap and of uniqueness |
 | `indexable` | everything else | every check |
 
 The report's `pages` counts each kind.
@@ -819,7 +819,7 @@ The report's `pages` counts each kind.
 | `sitemap.non_canonical_listed` | with a sitemap | the sitemap lists a redirect: list the page it points to |
 | `sitemap.missing_page` | with a sitemap | a warning; an error with `--sitemap-complete` |
 | `sitemap.not_found` | with `--base-url` | a warning: no sitemap found |
-| `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a `robots.txt` | robots.txt names a sitemap the build doesn't have, or the build has a sitemap robots.txt doesn't name (no Sitemap line and no sitemap is valid: that is `sitemap.not_found`'s warning) / shuts every crawler out of a site with pages to index |
+| `robots.sitemap_missing`, `robots.blocks_all` | with `--base-url` and a `robots.txt` | robots.txt names a sitemap the build doesn't have (an error), or has no `Sitemap:` line while the build has a sitemap (a warning: valid, and Hugo's default) / shuts every crawler out of a site with pages to index |
 | `og.missing`, `og.title_mismatch` | with `--og` | |
 | `verify.base_url_mismatch` | with `--base-url`, or without it when the pages claim a base path | the pages claim another address (their canonicals' host and base path), and it explains most of the errors: one error naming it (`found`; `given` is null without `--base-url`), plus the errors and warnings that remain under both addresses |
 | `verify.no_pages` | always | the folder has no HTML documents (an empty build) |
@@ -856,8 +856,8 @@ Errors carry `page` but no `route` or `template`: verify can't know which source
 page, and only molde's own `check` can. That is the difference between the two: run
 `check` on a molde site, and `verify` on anyone's.
 
-**What verify doesn't do:** fetch anything, run JavaScript, judge the text, check locales
-and size budgets, or follow `--base-url` guesses. Everything in [what the checks do not
+**What verify doesn't do:** fetch anything, run JavaScript, judge the text, check `#fragment`
+links against the target page's ids, check locales and size budgets, or follow `--base-url` guesses. Everything in [what the checks do not
 see](#what-the-checks-do-not-see) applies too, except that verify honours `<base href>`.
 
 ## Security model
