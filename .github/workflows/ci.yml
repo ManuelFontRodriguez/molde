@@ -44,6 +44,55 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
 
+  # The GitHub Action (action.yml), run as users run it, on a locally built molde: one
+  # fixture must pass, one must fail with exactly its recorded error.
+  action:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo build --locked
+      - run: python3 .github/action/test_molde_action.py
+        env:
+          MOLDE_BIN: target/debug/molde
+      - id: pass
+        uses: ./
+        with:
+          command: verify
+          dir: tests/verify/fixtures/built/hugo-realistic
+          base-url: https://example.org/
+          molde-path: target/debug/molde
+          comment: "false"
+      - id: fail
+        uses: ./
+        with:
+          command: verify
+          dir: tests/verify/fixtures/built/hugo-realistic-basepath
+          base-url: https://user.github.io/repo/
+          molde-path: target/debug/molde
+          comment: "false"
+          fail-on-error: "false"
+      - name: The two runs reported what the fixtures record
+        env:
+          PASS_VERDICT: ${{ steps.pass.outputs.verdict }}
+          FAIL_VERDICT: ${{ steps.fail.outputs.verdict }}
+          FAIL_ERRORS: ${{ steps.fail.outputs.errors }}
+          PASS_REPORT: ${{ steps.pass.outputs.report }}
+          FAIL_REPORT: ${{ steps.fail.outputs.report }}
+        run: |
+          test "$PASS_VERDICT" = pass
+          test "$FAIL_VERDICT" = fail
+          test "$FAIL_ERRORS" = 1
+          # each run keeps its own report
+          test "$PASS_REPORT" != "$FAIL_REPORT"
+          grep -q '"verdict": "pass"' "$PASS_REPORT"
+
   # The oldest Rust molde promises to build with (Cargo.toml `rust-version`).
   msrv:
     runs-on: ubuntu-latest

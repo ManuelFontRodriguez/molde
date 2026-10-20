@@ -1,0 +1,74 @@
+name: molde
+description: Check a site with molde. `check` builds and checks a molde site; `verify` checks any generator's built output (Hugo, Astro, Next.js, Eleventy, Zola). The report goes to the job summary and to one comment on the pull request, kept up to date.
+author: molde
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  command:
+    description: "`check` (a molde site) or `verify` (any built site)."
+    default: check
+  site:
+    description: "check: the site folder (routes.yaml, data.json, templates/)."
+    default: site
+  out:
+    description: "check: the output folder; the build is published to <out>/current only on a pass."
+    default: out
+  dir:
+    description: "verify: the built site, the folder the generator wrote (public/, dist/, out/, _site/)."
+    default: ""
+  base-url:
+    description: "verify: the site's public address, with its base path if it has one."
+    default: ""
+  args:
+    description: "More flags for the command, as you'd type them (for verify: --clean-urls, --ignore '/api/**', --unique, …)."
+    default: ""
+  version:
+    description: "The molde release to use (0.2.0), or `latest`. Empty: the release this action is pinned to (uses: …@v0.2.0); an action pinned to a commit or branch needs this set."
+    default: ""
+  comment:
+    description: "`true` or `false`. On a pull request, keep one comment with the report up to date (needs `pull-requests: write`). Each workflow, job and site gets its own comment."
+    default: "true"
+  fail-on-error:
+    description: "`true` or `false`. Fail the step when the check fails (its verdict, or molde's exit code)."
+    default: "true"
+  github-token:
+    description: "The token for the pull request comment (molde itself never sees it; releases are downloaded without it)."
+    default: ${{ github.token }}
+  molde-path:
+    description: "A molde binary to use instead of downloading one (for testing an unreleased build)."
+    default: ""
+
+outputs:
+  verdict:
+    description: "`pass` or `fail`."
+    value: ${{ steps.run.outputs.verdict }}
+  errors:
+    description: "The number of errors."
+    value: ${{ steps.run.outputs.errors }}
+  report:
+    description: "The path of the JSON report (one file per workflow, job and site)."
+    value: ${{ steps.run.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - id: run
+      shell: bash
+      # every input reaches the script through the environment, never through the shell
+      run: python3 "$GITHUB_ACTION_PATH/.github/action/molde_action.py"
+      env:
+        MOLDE_COMMAND: ${{ inputs.command }}
+        MOLDE_SITE: ${{ inputs.site }}
+        MOLDE_OUT: ${{ inputs.out }}
+        MOLDE_DIR: ${{ inputs.dir }}
+        MOLDE_BASE_URL: ${{ inputs.base-url }}
+        MOLDE_ARGS: ${{ inputs.args }}
+        MOLDE_VERSION: ${{ inputs.version }}
+        MOLDE_COMMENT: ${{ inputs.comment }}
+        MOLDE_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+        MOLDE_TOKEN: ${{ inputs.github-token }}
+        MOLDE_PATH: ${{ inputs.molde-path }}
+        MOLDE_ACTION_REF: ${{ github.action_ref }}
+        MOLDE_ACTION_REPOSITORY: ${{ github.action_repository }}
