@@ -96,28 +96,76 @@ struct Ref {
 
 /// Every URL a page makes the browser fetch or follow.
 fn html_refs(html: &str) -> Vec<Ref> {
-    static RES: OnceLock<(regex::Regex, regex::Regex, regex::Regex, regex::Regex)> =
-        OnceLock::new();
-    let (ref_re, srcset_re, style_attr_re, style_block_re) = RES.get_or_init(|| {
-        (
+    static RES: OnceLock<[regex::Regex; 5]> = OnceLock::new();
+    let [tag_re, ref_re, srcset_re, style_attr_re, style_block_re] = RES.get_or_init(|| {
+        [
+            // a start tag: `<` + a letter, then anything up to the `>` that closes it,
+            // quoted values (which may hold `>`) taken whole; a stray quote (`title=it's`)
+            // falls back to the first `>`, so the tag still counts
+            regex::Regex::new(
+                r#"<[A-Za-z][^>"']*(?:(?:"[^"]*"|'[^']*')[^>"']*)*>|<[A-Za-z][^>]*>"#,
+            )
+            .unwrap(),
             // double-quoted, single-quoted or unquoted, as HTML allows
             regex::Regex::new(r#"(?i)\b(href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))"#)
                 .unwrap(),
             regex::Regex::new(r#"(?i)\bsrcset\s*=\s*(?:"([^"]*)"|'([^']*)')"#).unwrap(),
             regex::Regex::new(r#"(?i)\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')"#).unwrap(),
             regex::Regex::new(r"(?is)<style\b[^>]*>(.*?)</style\s*>").unwrap(),
-        )
+        ]
     });
     // an unquoted `href=/x` is markup only outside scripts, styles and comments
-    // (`el.src=/re/.test(s)` in a script is code)
+    // (`el.src=/re/.test(s)` in a script is code). The spans are sorted and disjoint.
     let code: Vec<(usize, usize)> = code_re()
         .find_iter(html)
         .map(|m| (m.start(), m.end()))
         .collect();
-    let in_code = |at: usize| code.iter().any(|&(a, b)| a <= at && at < b);
+    let in_code = |at: usize| {
+        let i = code.partition_point(|&(a, _)| a <= at);
+        i > 0 && at < code[i - 1].1
+    };
+    // attributes are read inside tags and scripts only (a script's quoted URLs are
+    // checked, as they always were): text such as an escaped code sample
+    // (`&lt;link href=&quot;/favicon.ico&quot;&gt;` in a <pre>) is not a link
+    let scripts: Vec<(usize, usize)> = code
+        .iter()
+        .copied()
+        .filter(|&(a, _)| {
+            html[a..]
+                .get(..7)
+                .is_some_and(|t| t.eq_ignore_ascii_case("<script"))
+        })
+        .collect();
+    let in_script = |at: usize| {
+        let i = scripts.partition_point(|&(a, _)| a <= at);
+        i > 0 && at < scripts[i - 1].1
+    };
+    let mut regions: Vec<(usize, usize)> = tag_re
+        .find_iter(html)
+        .map(|m| (m.start(), m.end()))
+        .filter(|&(a, _)| !in_script(a))
+        .chain(scripts.iter().copied())
+        .collect();
+    regions.sort_unstable();
+    // Is a match at `at` an attribute the browser reads as `kind`? Inside a script, a
+    // quoted `img.src = "…"` counts as it always did. Inside a tag, the match must be a
+    // whole attribute name, not text inside another attribute's quoted value (a code
+    // sample in `data-code="…href=…"`), and the name must be the attribute itself or a
+    // data copy of it (`data-src`, `xlink:href`), not a framework binding (`:href`,
+    // `x-bind:href`, `v-bind:src`), whose value is code
+    let markup = |at: usize, kind: &str| {
+        let i = regions.partition_point(|&(a, _)| a <= at);
+        if i == 0 || at >= regions[i - 1].1 {
+            return false;
+        }
+        let start = regions[i - 1].0;
+        in_script(start) || attribute_named(&html[start..regions[i - 1].1], at - start, kind)
+    };
     let mut refs = Vec::new();
     for cap in ref_re.captures_iter(html) {
-        if cap.get(4).is_some_and(|bare| in_code(bare.start())) {
+        if !markup(cap.get(0).unwrap().start(), &cap[1])
+            || cap.get(4).is_some_and(|bare| in_code(bare.start()))
+        {
             continue;
         }
         let written = cap
@@ -131,6 +179,9 @@ fn html_refs(html: &str) -> Vec<Ref> {
         });
     }
     for cap in srcset_re.captures_iter(html) {
+        if !markup(cap.get(0).unwrap().start(), "srcset") {
+            continue;
+        }
         let value = cap.get(1).or(cap.get(2)).map_or("", |m| m.as_str());
         // "a.png 1x, b.png 2x": each candidate is a URL and an optional descriptor
         for candidate in value.split(',') {
@@ -143,6 +194,9 @@ fn html_refs(html: &str) -> Vec<Ref> {
         }
     }
     for cap in style_attr_re.captures_iter(html) {
+        if !markup(cap.get(0).unwrap().start(), "style") {
+            continue;
+        }
         let style = unescape_entities(cap.get(1).or(cap.get(2)).map_or("", |m| m.as_str()));
         refs.extend(css_refs(&style));
     }
@@ -150,6 +204,47 @@ fn html_refs(html: &str) -> Vec<Ref> {
         refs.extend(css_refs(&cap[1]));
     }
     refs
+}
+
+/// In the start tag `tag`, is the attribute name ending at the match `at` (`href`,
+/// `src`, `srcset`, `style`: `kind`) one the browser reads as that attribute? It must
+/// start outside any quoted value, and its whole name be `kind`, `xlink:href`, or
+/// `data-…-kind`-like (`data-src`, `data-lazy-src`): no `:`, `@`, `[` or `.` in it,
+/// which mark a framework binding (`:href`, `x-bind:href`, `@click`, `[href]`).
+fn attribute_named(tag: &str, at: usize, kind: &str) -> bool {
+    let bytes = tag.as_bytes();
+    // walk the tag to `at`, skipping quoted values (a quote opens one only after `=`)
+    let mut i = 1;
+    let mut after_eq = false;
+    while i < at {
+        let c = bytes[i];
+        if after_eq && (c == b'"' || c == b'\'') {
+            match tag[i + 1..].find(c as char) {
+                Some(end) => i += end + 2,
+                None => return false,
+            }
+            after_eq = false;
+            continue;
+        }
+        if c == b'=' {
+            after_eq = true;
+        } else if !c.is_ascii_whitespace() {
+            after_eq = false;
+        }
+        i += 1;
+    }
+    if i > at {
+        return false; // `at` is inside a quoted value
+    }
+    // the whole attribute name around the match
+    let name_start = tag[..at]
+        .rfind(|c: char| c.is_ascii_whitespace() || matches!(c, '"' | '\'' | '/' | '<'))
+        .map_or(0, |p| p + 1);
+    let name = tag[name_start..at + kind.len()].to_ascii_lowercase();
+    let kind = kind.to_ascii_lowercase();
+    name == kind
+        || (kind == "href" && name == "xlink:href")
+        || (name.ends_with(&format!("-{kind}")) && !name.contains([':', '@', '[', '.']))
 }
 
 /// Every `url()` and `@import` in CSS (comments skipped).
@@ -427,5 +522,37 @@ mod tests {
             );
         }
         assert!(!found.iter().any(|(_, w)| w == "skip.png"), "{found:?}");
+    }
+
+    /// A docs page that shows HTML in a code block: the escaped sample is text, not a
+    /// link (VitePress's docs had 61 such false errors); a real link inside <code>, a
+    /// `>` inside a quoted value and a script's quoted URL still count.
+    #[test]
+    fn attributes_are_read_inside_tags_only() {
+        let html = r#"<pre><code>&lt;link rel=&quot;icon&quot; href=&quot;/favicon.ico&quot;&gt;
+            <span>:src=&quot;$withBase('/foo.png')&quot;</span> href="/prose-quoted/"
+            srcset="/text.png 2x" style="background:url(/text.css)"</code></pre>
+            <p>write href=/bare-text/ in the tag</p>
+            <code><a href="struct.Page.html">Page</a></code>
+            <a title="a > b" href="/after-gt/">x</a>
+            <script>img.src="/in-script/";</script>
+            <a href=/stray-quote title=it's>y</a>
+            <button data-code="&lt;LinkCard href=&#x22;/in-value/&#x22; /&gt;" data-src="/data-src.png">c</button>
+            <a :href=entry.url x-bind:href="e.url" v-bind:src="x" @click="go('/x')" title="a href=/in-title">d</a>
+            <use xlink:href="/sprite.svg#i"/><img/src="/slash-src.png">"#;
+        let found: Vec<String> = html_refs(html).into_iter().map(|r| r.written).collect();
+        assert_eq!(
+            found,
+            [
+                "struct.Page.html",
+                "/after-gt/",
+                "/in-script/",
+                "/stray-quote",
+                "/data-src.png",
+                "/sprite.svg#i",
+                "/slash-src.png"
+            ],
+            "{found:?}"
+        );
     }
 }
