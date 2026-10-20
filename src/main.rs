@@ -126,6 +126,20 @@ enum Cmd {
     },
 }
 
+/// Write to stdout. A reader that stops early (`molde check | head`) closes the pipe:
+/// that is not an error, and must not panic as `println!` does. The exit code stays the
+/// command's own.
+fn stdout(text: &str) {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    if let Err(e) = out.write_all(text.as_bytes()).and_then(|()| out.flush()) {
+        if e.kind() != std::io::ErrorKind::BrokenPipe {
+            eprintln!("molde: writing the output: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
 fn main() -> Result<()> {
     match Cli::parse().cmd {
         Cmd::Build { site, out } => {
@@ -141,7 +155,7 @@ fn main() -> Result<()> {
         }
         Cmd::Check { site, out } => {
             let report = molde::run_check(&site, &out)?;
-            println!("{}", serde_json::to_string_pretty(&report)?);
+            stdout(&format!("{}\n", serde_json::to_string_pretty(&report)?));
             if report["verdict"] != "pass" {
                 std::process::exit(1);
             }
@@ -169,27 +183,27 @@ fn main() -> Result<()> {
             full,
         } => {
             let diff = molde::diff_builds(&out, from.as_deref(), to.as_deref(), full)?;
-            println!("{}", serde_json::to_string_pretty(&diff)?);
+            stdout(&format!("{}\n", serde_json::to_string_pretty(&diff)?));
             Ok(())
         }
         Cmd::Gc { out, keep } => {
             let gc = molde::gc_builds(&out, keep)?;
-            println!("{}", serde_json::to_string_pretty(&gc)?);
+            stdout(&format!("{}\n", serde_json::to_string_pretty(&gc)?));
             Ok(())
         }
         Cmd::Guide => {
-            print!("{}", include_str!("../docs/agents.md"));
+            stdout(include_str!("../docs/agents.md"));
             Ok(())
         }
         Cmd::Routes { site } => {
-            println!(
-                "{}",
+            stdout(&format!(
+                "{}\n",
                 serde_json::to_string_pretty(&molde::mcp::list_routes(&site)?)?
-            );
+            ));
             Ok(())
         }
         Cmd::Render { path, site } => {
-            print!("{}", molde::render_url(&site, &path)?);
+            stdout(&molde::render_url(&site, &path)?);
             Ok(())
         }
         Cmd::Events {
