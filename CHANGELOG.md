@@ -5,7 +5,10 @@ report) is listed here under the release that makes it, with what to do. What ea
 of release may change is in the reference's
 [compatibility](docs/reference.md#compatibility) section.
 
-## Unreleased
+## 0.2.0 — 2026-10-20
+
+`molde verify`, molde's output checks on any generator's build, and a GitHub Action that
+runs `check` or `verify` on pull requests. Since 0.1.0:
 
 ### Added
 
