@@ -53,6 +53,9 @@ of release may change is in the reference's
 - `titles.multiple` counted an icon's `<title>` as a second page title when an SVG
   sprite nests an `<svg>` inside a `<symbol>` (Sphinx's Furo theme does, on every page):
   SVG and MathML are now skipped to their matching end tag. Nothing to do.
+- A reader that stops early (`molde check --site site | head`) no longer makes molde
+  panic with "failed printing to stdout: Broken pipe"; the exit code is the command's
+  own. Nothing to do.
 
 ## 0.1.0 — 2026-10-19
 

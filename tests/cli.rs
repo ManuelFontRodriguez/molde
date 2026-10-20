@@ -117,6 +117,22 @@ fn routes_prints_the_json_the_list_routes_tool_returns() {
     assert!(!v["routes"].as_array().unwrap().is_empty());
 }
 
+/// A reader that closes the pipe early (`molde guide | head`) is not an error: the
+/// command used to panic with "failed printing to stdout: Broken pipe".
+#[test]
+fn a_closed_pipe_is_not_a_panic() {
+    let (reader, writer) = std::io::pipe().unwrap();
+    drop(reader);
+    let out = Command::new(env!("CARGO_BIN_EXE_molde"))
+        .arg("guide")
+        .stdout(writer)
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!stderr.contains("panicked"), "{stderr}");
+    assert_eq!(out.status.code(), Some(0), "{stderr}");
+}
+
 fn tmp(tag: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("molde-cli-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
