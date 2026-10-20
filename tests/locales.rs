@@ -191,6 +191,11 @@ fn full_site_passes_with_hreflang_lang_and_translations() {
         report["pages_by_locale"][1]["pages"],
         serde_json::json!({"de": 1, "en": 2, "es": 2})
     );
+    // routes can share a path pattern: the template and collection tell them apart (#13)
+    assert_eq!(report["pages_by_locale"][1]["template"], "book.html.j2");
+    assert_eq!(report["pages_by_locale"][1]["foreach"], "books");
+    assert_eq!(report["pages_by_locale"][0]["template"], "home.html.j2");
+    assert!(report["pages_by_locale"][0].get("foreach").is_none());
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -539,6 +544,8 @@ fn sparse_locale_is_a_warning_not_an_error() {
     assert_eq!(w[0]["locale"], "de");
     assert_eq!(w[0]["pages"], 1);
     assert_eq!(w[0]["default_pages"], 3);
+    assert_eq!(w[0]["template"], "book.html.j2");
+    assert_eq!(w[0]["foreach"], "books");
     let _ = fs::remove_dir_all(&dir);
 }
 

@@ -13,6 +13,9 @@ of release may change is in the reference's
   title and description patterns (the strings `std_head` prints) and its `index` value,
   so a template can add `twitter:title` or a tag only on indexable pages without
   repeating the route's patterns. Nothing to do.
+- The check report's `pages_by_locale` entries and `i18n.sparse_locale` warnings carry
+  the route's `template` and, on `foreach` routes, `foreach` (the collection) next to
+  `route`, so routes that share a path pattern can be told apart. Nothing to do.
 
 ### Changed
 
