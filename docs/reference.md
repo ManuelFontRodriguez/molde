@@ -699,10 +699,13 @@ check, plus a `routes` array naming all offenders.
 | `config.parse` | `routes.yaml`, `site.yaml`, `data.json` or a `translations/*.yaml` file does not parse (`file`, `line`, `message`). `layer: source`, `build: null` |
 | `config.invalid` | the files parse but the router rejects them: a `foreach` over a missing collection, an `index` pattern that renders neither `true` nor `false`, a bad locale setting (`message` names the route or value). `layer: source`, `build: null` |
 
-With `locales:` the report also has `pages_by_locale` (`[{route, pages: {locale: n}}]`
-per localized route) and `warnings`, which never fail the check.
+With `locales:` the report also has `pages_by_locale` (`[{route, template, foreach?,
+pages: {locale: n}}]` per localized route) and `warnings`, which never fail the check.
+Both name a route by its path pattern (on a route with per-locale paths, those paths as
+one string), its `template` and, on `foreach` routes, the collection, since several
+routes can share one pattern.
 `i18n.sparse_locale` fires when a locale has fewer than half the default locale's pages
-for a route (`route`, `locale`, `pages`, `default_pages`) — a data builder that forgot a
+for a route (`route`, `template`, `foreach`, `locale`, `pages`, `default_pages`) — a data builder that forgot a
 locale would otherwise pass, since a missing value is a legitimate "no page". Sites
 without `locales:` have neither key.
 

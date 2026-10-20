@@ -1043,18 +1043,28 @@ pub fn warnings(site: &Site, pages: &[Page]) -> Vec<serde_json::Value> {
         for tag in route_tags(&site.config, route) {
             let n = counts.get(&tag).copied().unwrap_or(0);
             if tag != default && 2 * n < d {
-                out.push(serde_json::json!({
-                    "layer": "routes",
-                    "check": "i18n.sparse_locale",
-                    "route": route.path.to_string(),
-                    "locale": tag,
-                    "pages": n,
-                    "default_pages": d,
-                }));
+                let mut w = route_id(route);
+                w["layer"] = serde_json::json!("routes");
+                w["check"] = serde_json::json!("i18n.sparse_locale");
+                w["locale"] = serde_json::json!(tag);
+                w["pages"] = serde_json::json!(n);
+                w["default_pages"] = serde_json::json!(d);
+                out.push(w);
             }
         }
     }
     out
+}
+
+/// How the report names a route outside an error: its path pattern, its template and,
+/// on `foreach` routes, the collection. Several routes can share one pattern (three
+/// `foreach` routes at `/{slug}/index.html`); the template and collection tell them apart.
+pub(crate) fn route_id(route: &Route) -> serde_json::Value {
+    let mut id = serde_json::json!({ "route": route.path.to_string(), "template": route.template });
+    if let Some(f) = &route.foreach {
+        id["foreach"] = serde_json::json!(f);
+    }
+    id
 }
 
 /// `alternates` in a page's template context, for a language switcher:

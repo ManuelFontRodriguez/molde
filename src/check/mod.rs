@@ -186,10 +186,9 @@ impl LocaleExtras {
                 .enumerate()
                 .filter(|(_, r)| !locales::route_tags(&site.config, r).is_empty())
                 .map(|(idx, r)| {
-                    serde_json::json!({
-                        "route": r.path.to_string(),
-                        "pages": locales::counts_by_locale(site, idx, pages),
-                    })
+                    let mut entry = locales::route_id(r);
+                    entry["pages"] = serde_json::json!(locales::counts_by_locale(site, idx, pages));
+                    entry
                 })
                 .collect::<Vec<_>>()
         });
