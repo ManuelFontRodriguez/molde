@@ -121,6 +121,8 @@ pub fn sound(lang: &str, value: &str, exceptions: &Exceptions) -> Sound {
                 return Sound::Consonant;
             }
             match lower.as_str() {
+                // an acronym or ticker read letter by letter: "ache", a vowel ("d'HSBC")
+                "h" if is_acronym(&first_word()) => Sound::Vowel,
                 "h" => Sound::Undecided(first_word()),
                 // y before a vowel is a consonant sound: "de Yamaha", "le yaourt"
                 "y" => match next {
@@ -150,6 +152,13 @@ pub fn sound(lang: &str, value: &str, exceptions: &Exceptions) -> Sound {
         }
         _ => Sound::Consonant,
     }
+}
+
+/// An acronym or ticker, read letter by letter: capitals (and digits), more than one
+/// character, e.g. "HSBC", "HNR1".
+fn is_acronym(word: &str) -> bool {
+    word.chars().count() > 1
+        && word.chars().all(|c| c.is_uppercase() || c.is_ascii_digit())
 }
 
 /// What to do where `before` (the text so far) meets a value.
@@ -257,6 +266,16 @@ mod tests {
         assert_eq!(e("fr", "de  ", "Aperam"), "de  Aperam");
         assert_eq!(e("fr", "de", "Aperam"), "deAperam");
         assert_eq!(e("fr", "aujourd'hui ", "Aperam"), "aujourd'hui Aperam");
+    }
+
+    #[test]
+    fn french_reads_an_h_acronym_as_a_vowel() {
+        assert_eq!(e("fr", "de ", "HSBC"), "d'HSBC");
+        assert_eq!(e("fr", "de ", "HNR1"), "d'HNR1");
+        // a name in capitals is still a word: only an acronym is spelled out
+        let ex = Exceptions::default();
+        assert_eq!(join("fr", "de ", "Henkel", &ex), Join::Undecided("Henkel".into()));
+        assert_eq!(join("fr", "de ", "H", &ex), Join::Undecided("H".into()));
     }
 
     #[test]

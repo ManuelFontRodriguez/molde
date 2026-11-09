@@ -352,8 +352,9 @@ routes:
   and must be in `locales:`; a language molde has no rules for, or `elision:` without
   `locales:`, is a load error. Without the key nothing changes.
   - **French** elides `de le la que jusque lorsque puisque ne je me te se` (`De` → `D'`)
-    before a value starting with a vowel or `y` + consonant (`d'AEX`, `d'Yves`), but not
-    before a figure (`de 8 %`), `onze`, `onzième`, `oui`, or `y` + vowel (`de Yamaha`).
+    before a value starting with a vowel or `y` + consonant (`d'AEX`, `d'Yves`), or with
+    an acronym spelled out from H (capitals, e.g. `d'HSBC`, `d'HNR1`), but not before a
+    figure (`de 8 %`), `onze`, `onzième`, `oui`, or `y` + vowel (`de Yamaha`).
   - **Italian** elides `il lo la` and `del dello della al allo alla dal dallo dalla nel
     nello nella sul sullo sulla una quello quella` before a value starting with a vowel,
     and before a number read with a vowel: one starting with 8 (`l'8 maggio`, `l'87%`,
