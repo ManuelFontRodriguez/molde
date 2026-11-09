@@ -5,6 +5,16 @@ report) is listed here under the release that makes it, with what to do. What ea
 of release may change is in the reference's
 [compatibility](docs/reference.md#compatibility) section.
 
+## Unreleased
+
+- `elision:` in site.yaml: French and Italian elision where `t()` / `t_html()` insert a
+  value (`de` + `Aperam` → `d'Aperam`, `il` + `87` → `l'87`). Only the word right before
+  the value changes, by the language's rule; see Elision in the reference's Locales
+  section. Opt-in per locale: sites without the key build byte-identical.
+- New warning `elision.undecided`: a value starting with "h" met an elidable word and
+  site.yaml doesn't say whether it elides; it is kept as written. List it under
+  `elision.<locale>.vowel_sound` or `consonant_sound`.
+
 ## 0.2.0 — 2026-10-20
 
 `molde verify`, molde's output checks on any generator's build, and a GitHub Action that
