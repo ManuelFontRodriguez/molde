@@ -17,6 +17,7 @@ const HOME: &str = "<!doctype html><html lang=\"{{ locale }}\"><head><meta chars
 <p id=\"p\">{{ t('paid', pct=87) }}</p>\
 <p id=\"f\">{{ t('pool.3', args={'name': 'ISIN', 'unused': 1}) }}</p>\
 <p id=\"m\">{{ t_html('symbol', name='Enel') }}</p>\
+<p id=\"v\">{{ t('pair', a='de', n='Aperam') }}</p>\
 </body></html>";
 
 fn tmp(name: &str) -> PathBuf {
@@ -35,15 +36,15 @@ fn site(name: &str, site_yaml: &str, home: &str) -> PathBuf {
         ("templates/home.html.j2", home),
         (
             "translations/en.yaml",
-            "title: Home\nsymbol: \"The symbol of {name}\"\npaid: \"It paid {pct}% of its earnings\"\npool:\n  \"3\": \"The symbol of the {name}\"\n",
+            "pair: \"{a} {n}\"\ntitle: Home\nsymbol: \"The symbol of {name}\"\npaid: \"It paid {pct}% of its earnings\"\npool:\n  \"3\": \"The symbol of the {name}\"\n",
         ),
         (
             "translations/fr.yaml",
-            "title: Accueil\nsymbol: \"Le symbole de {name}\"\npaid: \"Elle a versé {pct} % de ses bénéfices\"\npool:\n  \"3\": \"Le symbole de {name}\"\n",
+            "pair: \"{a} {n}\"\ntitle: Accueil\nsymbol: \"Le symbole de {name}\"\npaid: \"Elle a versé {pct} % de ses bénéfices\"\npool:\n  \"3\": \"Le symbole de {name}\"\n",
         ),
         (
             "translations/it.yaml",
-            "title: Home\nsymbol: \"Il simbolo di {name}\"\npaid: \"Ha pagato il {pct}% dei suoi utili\"\npool:\n  \"3\": \"Il simbolo del {name}\"\n",
+            "pair: \"{a} {n}\"\ntitle: Home\nsymbol: \"Il simbolo di {name}\"\npaid: \"Ha pagato il {pct}% dei suoi utili\"\npool:\n  \"3\": \"Il simbolo del {name}\"\n",
         ),
     ];
     for (path, body) in files {
@@ -100,6 +101,8 @@ fn values_elide_the_word_before_them_in_french_and_italian() {
         "a text-pool variant (`args=`) elides too"
     );
     assert_eq!(it["a"], "Il simbolo di Aperam", "\"di\" is not elided");
+    // only the translation's own text changes: a value that ends in "de" stays
+    assert_eq!(fr["v"], "de Aperam");
 
     // English has no rules: untouched
     let en = paragraphs(&dir, &report, "index.html");
@@ -115,6 +118,10 @@ fn values_elide_the_word_before_them_in_french_and_italian() {
     assert_eq!(undecided.len(), 1, "{report:#}");
     assert_eq!(undecided[0]["locale"], "fr");
     assert_eq!(undecided[0]["word"], "Hannover");
+    assert_eq!(
+        undecided[0]["templates"],
+        serde_json::json!(["home.html.j2"])
+    );
     assert!(undecided[0]["hint"]
         .as_str()
         .unwrap()
@@ -159,6 +166,10 @@ fn elision_config_is_validated_at_load() {
         (
             "locales: [en, fr]\nelision:\n  fr:\n    silent_h: [x]\n",
             "silent_h",
+        ),
+        (
+            "locales: [en, fr]\nelision:\n  fr:\n    vowel_sound: [Hera]\n    consonant_sound: [Hera]\n",
+            "in both",
         ),
     ] {
         let dir = site("config", yaml, HOME);

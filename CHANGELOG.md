@@ -11,9 +11,9 @@ of release may change is in the reference's
   value (`de` + `Aperam` → `d'Aperam`, `il` + `87` → `l'87`). Only the word right before
   the value changes, by the language's rule; see Elision in the reference's Locales
   section. Opt-in per locale: sites without the key build byte-identical.
-- New warning `elision.undecided`: a value starting with "h" met an elidable word and
-  site.yaml doesn't say whether it elides; it is kept as written. List it under
-  `elision.<locale>.vowel_sound` or `consonant_sound`.
+- New warning `elision.undecided` (`locale`, `word`, `templates`): a value starting
+  with "h" met an elidable word and site.yaml doesn't say whether it elides; it is kept
+  as written. List it under `elision.<locale>.vowel_sound` or `consonant_sound`.
 
 ## 0.2.0 — 2026-10-20
 

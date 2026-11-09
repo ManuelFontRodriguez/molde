@@ -24,9 +24,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 /// of aborting the render, so every other layer still runs.
 pub type UnknownKeys = Arc<Mutex<BTreeSet<(String, String, String)>>>;
 
-/// "h" values met after an elidable word while rendering: (locale, word). Reported as
-/// the `elision.undecided` warning.
-pub type ElisionUndecided = Arc<Mutex<BTreeSet<(String, String)>>>;
+/// "h" values met after an elidable word while rendering: (locale, word) -> the
+/// templates that met them. Reported as the `elision.undecided` warning.
+pub type ElisionUndecided = Arc<Mutex<BTreeMap<(String, String), BTreeSet<String>>>>;
 
 /// `pt-BR` -> `pt-br`: a tag's URL prefix.
 pub fn prefix(tag: &str) -> String {
@@ -67,7 +67,10 @@ pub fn validate_config(config: &SiteConfig) -> Result<()> {
         }
         return Ok(());
     };
-    for tag in config.elision.iter().flat_map(|e| e.keys()) {
+    for (tag, e) in config.elision.iter().flatten() {
+        if let Some(w) = e.vowel_sound.iter().find(|w| e.consonant_sound.contains(w)) {
+            bail!("site.yaml elision.{tag}: {w:?} is in both vowel_sound and consonant_sound");
+        }
         if !tags.contains(tag) {
             bail!("site.yaml elision: {tag:?} isn't in site.yaml locales {tags:?}");
         }
@@ -643,43 +646,61 @@ fn elision_rules(config: &SiteConfig) -> ElisionRules {
         .collect()
 }
 
+/// One `t()` argument: as written into the output, its text for the elision test, and
+/// whether it is markup (a safe `t_html` argument, whose leading tags are skipped).
+struct Arg {
+    written: String,
+    plain: String,
+    markup: bool,
+}
+
 /// Fills `text`'s `{placeholders}` in one pass (a value is never scanned for
-/// placeholders again); a placeholder without an argument stays literal. Each argument
-/// is (as written into the output, plain text for the elision test). With the locale's
-/// elision on, the word right before a value elides when the value starts with a vowel
-/// sound ("de " + "Aperam" -> "d'Aperam"); an undecided "h" value is recorded instead.
+/// placeholders again); a placeholder without an argument stays literal. With the
+/// locale's elision on, the translation's word right before a value elides when the
+/// value starts with a vowel sound ("de " + "Aperam" -> "d'Aperam"). Only the
+/// translation's own text can change, never an earlier value; an undecided "h" value is
+/// recorded with the template instead.
 fn interpolate(
     text: &str,
-    args: &BTreeMap<String, (String, String)>,
-    locale: &str,
+    args: &BTreeMap<String, Arg>,
+    at: (&str, &str),
     rules: &ElisionRules,
     undecided: &ElisionUndecided,
 ) -> String {
+    let (locale, template) = at;
     let elide = rules.get(locale);
     let mut out = String::with_capacity(text.len() + 32);
     let mut last = 0;
     for c in placeholder_re().captures_iter(text) {
         let m = c.get(0).unwrap();
+        // where the translation's text before this placeholder begins in `out`
+        let literal = out.len();
         out.push_str(&text[last..m.start()]);
         last = m.end();
-        let Some((written, plain)) = args.get(&c[1]) else {
+        let Some(arg) = args.get(&c[1]) else {
             out.push_str(m.as_str());
             continue;
         };
         if let Some((lang, ex)) = elide {
-            use i18n::elision::{join, plain_start, Join};
-            match join(lang, &out, plain_start(plain), ex) {
-                Join::Elide { cut, word } => {
+            use i18n::elision::{join, leading_text, Join};
+            let value = leading_text(&arg.plain, arg.markup);
+            match join(lang, &out, &value, ex) {
+                Join::Elide { cut, word } if cut >= literal => {
                     out.truncate(cut);
                     out.push_str(&word);
                 }
                 Join::Undecided(w) => {
-                    undecided.lock().unwrap().insert((locale.to_string(), w));
+                    undecided
+                        .lock()
+                        .unwrap()
+                        .entry((locale.to_string(), w))
+                        .or_default()
+                        .insert(template.to_string());
                 }
-                Join::Keep => {}
+                _ => {}
             }
         }
-        out.push_str(written);
+        out.push_str(&arg.written);
     }
     out.push_str(&text[last..]);
     out
@@ -752,18 +773,32 @@ pub fn register(
                 return Err(print_error(l));
             }
             let plain = v.to_string();
-            let text = match html && !v.is_safe() {
+            let written = match html && !v.is_safe() {
                 true => crate::check::html::attr_escape(&plain),
                 false => plain.clone(),
             };
-            args.insert(name, (text, plain));
+            let markup = html && v.is_safe();
+            args.insert(
+                name,
+                Arg {
+                    written,
+                    plain,
+                    markup,
+                },
+            );
         }
         kwargs.assert_all_used()?;
         // absent in this locale: renders empty, `translations.missing` reports it
         let Some(text) = translations.by_locale.get(&locale).and_then(|m| m.get(key)) else {
             return Ok(String::new());
         };
-        Ok(interpolate(text, &args, &locale, &rules, &undecided))
+        Ok(interpolate(
+            text,
+            &args,
+            (&locale, state.name()),
+            &rules,
+            &undecided,
+        ))
     };
     let t = Arc::new(translate);
     let t1 = t.clone();
@@ -1096,12 +1131,17 @@ pub fn elision_warnings(site: &Site) -> Vec<serde_json::Value> {
         .lock()
         .unwrap()
         .iter()
-        .map(|(locale, word)| {
+        .map(|((locale, word), templates)| {
             serde_json::json!({
                 "layer": "translations",
                 "check": "elision.undecided",
                 "locale": locale,
                 "word": word,
+                // a route pattern (title, description) reads as its routes.yaml source
+                "templates": templates
+                    .iter()
+                    .map(|t| pattern_source(site, t).unwrap_or_else(|| t.clone()))
+                    .collect::<Vec<_>>(),
             })
         })
         .collect()

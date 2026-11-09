@@ -82,20 +82,29 @@ pub enum Sound {
 
 /// How the value is read aloud at its start. `value` is the plain text (no markup).
 pub fn sound(lang: &str, value: &str, exceptions: &Exceptions) -> Sound {
-    let v = value.trim_start_matches(['"', '\'', '«', '“', '‘', '(', '[', ' ', '\u{a0}']);
-    if exceptions
-        .vowel_sound
-        .iter()
-        .any(|w| v.starts_with(w.as_str()))
-    {
-        return Sound::Vowel;
-    }
-    if exceptions
-        .consonant_sound
-        .iter()
-        .any(|w| v.starts_with(w.as_str()))
-    {
-        return Sound::Consonant;
+    let v = value.trim_start_matches(['"', '\'', '«', '“', '‘', '(', '[']);
+    // the site's entries win over the rules; the longest matching entry decides
+    // ("Ha" vowel, "Hamburger" consonant: "Hamburger" is a consonant)
+    let longest = |list: &[String]| {
+        list.iter()
+            .filter(|w| !w.is_empty() && v.starts_with(w.as_str()))
+            .map(String::len)
+            .max()
+    };
+    match (
+        longest(&exceptions.vowel_sound),
+        longest(&exceptions.consonant_sound),
+    ) {
+        (Some(a), Some(b)) => {
+            return if a > b {
+                Sound::Vowel
+            } else {
+                Sound::Consonant
+            }
+        }
+        (Some(_), None) => return Sound::Vowel,
+        (None, Some(_)) => return Sound::Consonant,
+        (None, None) => {}
     }
     let mut chars = v.chars();
     let Some(first) = chars.next() else {
@@ -154,11 +163,14 @@ pub fn sound(lang: &str, value: &str, exceptions: &Exceptions) -> Sound {
     }
 }
 
-/// An acronym or ticker, read letter by letter: capitals (and digits), more than one
-/// character, e.g. "HSBC", "HNR1".
+/// An acronym or ticker, read letter by letter: 2 to 5 plain capitals or digits, e.g.
+/// "HSBC", "HNR1". A longer or accented capitalised word ("HERMÈS", "HEIDELBERG") is a
+/// name in capitals, which the letter can't decide.
 fn is_acronym(word: &str) -> bool {
-    word.chars().count() > 1
-        && word.chars().all(|c| c.is_uppercase() || c.is_ascii_digit())
+    (2..=5).contains(&word.chars().count())
+        && word
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
 }
 
 /// What to do where `before` (the text so far) meets a value.
@@ -173,20 +185,26 @@ pub enum Join {
 }
 
 /// `before` must end with an elidable word and exactly one space ("… de "), the word
-/// standing alone (start of text, or after a non-letter): then a vowel-sound value
-/// elides it. Case follows the word ("De" -> "D'").
+/// standing alone: at the start of `before`, or after a space or punctuation other than
+/// a hyphen or an apostrophe ("dis-le", "aujourd'hui" never elide). A value that starts
+/// with whitespace is never elided (it would read "d' Aperam"). Case follows the word:
+/// "De" -> "D'", "QUE" -> "QU'".
 pub fn join(lang: &str, before: &str, value: &str, exceptions: &Exceptions) -> Join {
     let Some(head) = before.strip_suffix(' ') else {
         return Join::Keep;
     };
-    let start = head
-        .char_indices()
-        .rev()
-        .find(|(_, c)| !c.is_alphabetic())
-        .map(|(i, c)| i + c.len_utf8())
-        .unwrap_or(0);
+    if value.starts_with(char::is_whitespace) {
+        return Join::Keep;
+    }
+    let boundary = head.char_indices().rev().find(|(_, c)| !c.is_alphabetic());
+    if let Some((_, c)) = boundary {
+        if matches!(c, '-' | '‐' | '‑' | '\'' | '’') {
+            return Join::Keep;
+        }
+    }
+    let start = boundary.map(|(i, c)| i + c.len_utf8()).unwrap_or(0);
     let word = &head[start..];
-    if word.is_empty() || word.contains(['\'', '’']) {
+    if word.is_empty() {
         return Join::Keep;
     }
     let lower = word.to_lowercase();
@@ -197,14 +215,17 @@ pub fn join(lang: &str, before: &str, value: &str, exceptions: &Exceptions) -> J
         Sound::Consonant => Join::Keep,
         Sound::Undecided(w) => Join::Undecided(w),
         Sound::Vowel => {
-            let mut out = String::with_capacity(elided.len());
-            let mut cs = elided.chars();
-            if word.starts_with(char::is_uppercase) {
-                if let Some(c) = cs.next() {
-                    out.extend(c.to_uppercase());
-                }
-            }
-            out.extend(cs);
+            let all_caps = word.chars().count() > 1 && word.chars().all(char::is_uppercase);
+            let out: String = if all_caps {
+                elided.to_uppercase()
+            } else if word.starts_with(char::is_uppercase) {
+                let mut cs = elided.chars();
+                cs.next()
+                    .map(|c| c.to_uppercase().chain(cs).collect())
+                    .unwrap_or_default()
+            } else {
+                elided.to_string()
+            };
             Join::Elide {
                 cut: start,
                 word: out,
@@ -213,19 +234,42 @@ pub fn join(lang: &str, before: &str, value: &str, exceptions: &Exceptions) -> J
     }
 }
 
-/// The value's text for the sound test: leading markup (`<strong>`) and entities
-/// (`&#39;`) skipped, so `t_html` values with markup elide like plain ones.
-pub fn plain_start(value: &str) -> &str {
+/// The value's text for the sound test. A plain value is its own text. A markup value
+/// (a safe argument of `t_html`) has its leading tags skipped (quoted attributes may
+/// hold `>`) and a leading numeric or basic named entity decoded, so `<strong>Aperam`
+/// and `&#201;ric` read as "Aperam" and "Éric" (other named entities stay as written,
+/// so such a value is not elided).
+pub fn leading_text(value: &str, markup: bool) -> String {
+    if !markup {
+        return value.to_string();
+    }
     let mut v = value;
-    loop {
-        if v.starts_with('<') {
-            match v.find('>') {
-                Some(i) => v = &v[i + 1..],
-                None => return v,
+    while v.starts_with('<') {
+        let mut quote: Option<char> = None;
+        let mut end = None;
+        for (i, c) in v.char_indices().skip(1) {
+            match quote {
+                Some(q) if c == q => quote = None,
+                Some(_) => {}
+                None if c == '"' || c == '\'' => quote = Some(c),
+                None if c == '>' => {
+                    end = Some(i);
+                    break;
+                }
+                None => {}
             }
-        } else {
-            return v;
         }
+        match end {
+            Some(i) => v = &v[i + 1..],
+            None => return String::new(),
+        }
+    }
+    match v.strip_prefix('&').and_then(|rest| rest.find(';')) {
+        Some(i) if i < 32 => {
+            let decoded = crate::check::html::unescape_entities(&v[..i + 2]);
+            format!("{decoded}{}", &v[i + 2..])
+        }
+        _ => v.to_string(),
     }
 }
 
@@ -274,7 +318,10 @@ mod tests {
         assert_eq!(e("fr", "de ", "HNR1"), "d'HNR1");
         // a name in capitals is still a word: only an acronym is spelled out
         let ex = Exceptions::default();
-        assert_eq!(join("fr", "de ", "Henkel", &ex), Join::Undecided("Henkel".into()));
+        assert_eq!(
+            join("fr", "de ", "Henkel", &ex),
+            Join::Undecided("Henkel".into())
+        );
         assert_eq!(join("fr", "de ", "H", &ex), Join::Undecided("H".into()));
     }
 
@@ -319,12 +366,47 @@ mod tests {
     }
 
     #[test]
-    fn markup_before_the_value_is_skipped() {
-        assert_eq!(plain_start("<strong>Aperam</strong>"), "Aperam</strong>");
+    fn markup_is_skipped_only_in_markup_values() {
         assert_eq!(
-            sound("fr", plain_start("<b><i>Aperam"), &Exceptions::default()),
-            Sound::Vowel
+            leading_text("<strong>Aperam</strong>", true),
+            "Aperam</strong>"
         );
+        assert_eq!(leading_text(r#"<img alt="x>y">Aperam"#, true), "Aperam");
+        assert_eq!(leading_text("&#201;ric", true), "Éric");
+        // a named entity beyond the basic ones stays as written: no elision, never a guess
+        assert_eq!(leading_text("&Eacute;ric", true), "&Eacute;ric");
+        assert_eq!(leading_text("<b>Hamburger", false), "<b>Hamburger");
+        assert_eq!(leading_text("<b", true), "");
+    }
+
+    #[test]
+    fn review_cases() {
+        let ex = Exceptions::default();
+        // a value with leading whitespace is never elided
+        assert_eq!(join("fr", "de ", " Aperam", &ex), Join::Keep);
+        assert_eq!(join("fr", "de ", "\u{a0}Aperam", &ex), Join::Keep);
+        // a clitic after a hyphen or an apostrophe stays
+        assert_eq!(e("fr", "dis-le ", "Aperam"), "dis-le Aperam");
+        assert_eq!(e("fr", "garde-de ", "Aperam"), "garde-de Aperam");
+        // a name in capitals is not an acronym
+        assert_eq!(
+            join("fr", "de ", "HERMÈS", &ex),
+            Join::Undecided("HERMÈS".into())
+        );
+        assert_eq!(
+            join("fr", "de ", "HEIDELBERG", &ex),
+            Join::Undecided("HEIDELBERG".into())
+        );
+        // all-caps words elide in caps
+        assert_eq!(e("fr", "QUE ", "Engie"), "QU'Engie");
+        assert_eq!(e("fr", "Que ", "Engie"), "Qu'Engie");
+        // the longest exception decides
+        let ex = Exceptions {
+            vowel_sound: vec!["Ha".into()],
+            consonant_sound: vec!["Hamburger".into()],
+        };
+        assert_eq!(join("fr", "de ", "Hamburger", &ex), Join::Keep);
+        assert!(matches!(join("fr", "de ", "Hals", &ex), Join::Elide { .. }));
     }
 
     #[test]
