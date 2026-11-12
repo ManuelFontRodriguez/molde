@@ -355,8 +355,7 @@ routes:
   Locales are listed by tag (`fr`, `fr-CA`, `it`; the language subtag picks the rules)
   and must be in `locales:`; a language molde has no rules for, or `elision:` without
   `locales:`, is a load error. Without the key nothing changes.
-  - **French** elides `de le la que jusque lorsque puisque ne je me te se` (`De` → `D'`)
-    before a value starting with a vowel or `y` + consonant (`d'AEX`, `d'Yves`), or with
+  - **French** elides `de le la que jusque lorsque puisque ne je me te se` before a value starting with a vowel or `y` + consonant (`d'AEX`, `d'Yves`), or with
     an acronym spelled out from H (2 to 5 plain capitals or digits: `d'HSBC`, `d'HNR1`;
     a longer or accented capitalised name such as `HERMÈS` is a word, see "h" below),
     but not before a figure (`de 8 %`), `onze`, `onzième`, `oui`, or `y` + vowel
@@ -370,14 +369,12 @@ routes:
     but `le héros`): list it under `vowel_sound` (it elides) or `consonant_sound` (it
     doesn't). Entries match the start of the value, case-sensitively, and also settle any
     other value the spelling would get wrong; when entries of both lists match, the
-    longest decides (`Ha` vowel and `Hamburger` consonant: `Hamburger` keeps `de`). The
-    same entry in both lists is a load error. An undecided value is kept as written and
+    longest decides. The same entry in both lists is a load error. An undecided value is kept as written and
     reported as the `elision.undecided` warning, once per locale and word, with the
     templates that met it.
-  - The elided word ends in an ASCII apostrophe. A `t_html` argument marked safe is read
-    past its leading tags and a leading numeric or basic named entity (`<strong>Aperam`,
-    `&#201;ric`); any other value is read as text, and one starting with another named
-    entity (`&Eacute;ric`) is not elided.
+  - The elided word ends in an ASCII apostrophe. A `t_html` value marked safe is read past
+    its leading tags (`<strong>Aperam`); one starting with a named entity other than the
+    basic ones (`&Eacute;ric`) is not elided.
 - **Any well-formed tag is a locale** (`ja`, `ar`, `zh`, `no`, `pt-BR`): paths, hreflang,
   `t()` and `| loc` need nothing per language. Only the formatting filters need data,
   and CLDR's covers all of these — see the next point.
@@ -744,9 +741,9 @@ pages: {locale: n}}]` per localized route) and `warnings`, which never fail the 
 Both name a route by its path pattern (on a route with per-locale paths, those paths as
 one string), its `template` and, on `foreach` routes, the collection, since several
 routes can share one pattern.
-`elision.undecided` (`layer: translations`, `locale`, `word`, `templates`) fires when an elidable word
-met a value starting with "h" that site.yaml `elision:` doesn't list (see Elision under
-Locales); the text was kept as written.
+`elision.undecided` (`layer: translations`, `locale`, `word`, `templates`) fires when an
+elidable word met a value starting with "h" that site.yaml `elision:` doesn't list (see
+Elision under Locales); the text was kept as written.
 `i18n.sparse_locale` fires when a locale has fewer than half the default locale's pages
 for a route (`route`, `template`, `foreach`, `locale`, `pages`, `default_pages`) — a data builder that forgot a
 locale would otherwise pass, since a missing value is a legitimate "no page". Sites
