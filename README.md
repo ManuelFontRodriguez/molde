@@ -64,7 +64,7 @@ molde runs on **Linux and macOS** (Windows: use WSL).
 put `molde` on your `PATH`:
 
 ```sh
-VERSION=0.2.0
+VERSION=0.3.0
 TARGET=aarch64-apple-darwin        # or x86_64-apple-darwin, x86_64-unknown-linux-musl, aarch64-unknown-linux-musl
 curl -fLO "https://github.com/ManuelFontRodriguez/molde/releases/download/v$VERSION/molde-$VERSION-$TARGET.tar.gz"
 curl -fLO "https://github.com/ManuelFontRodriguez/molde/releases/download/v$VERSION/SHA256SUMS"
@@ -81,7 +81,7 @@ avoids that (or run `xattr -d com.apple.quarantine molde`).
 **From source** (Rust 1.89 or newer, from [rustup.rs](https://rustup.rs)):
 
 ```sh
-cargo install --locked --git https://github.com/ManuelFontRodriguez/molde --tag v0.2.0
+cargo install --locked --git https://github.com/ManuelFontRodriguez/molde --tag v0.3.0
 ```
 
 ## Your first site in five minutes
@@ -213,7 +213,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
   - run: hugo --cleanDestinationDir   # or any generator; for a molde site, skip this
-  - uses: ManuelFontRodriguez/molde@v0.2.0
+  - uses: ManuelFontRodriguez/molde@v0.3.0
     with:
       command: verify               # or check, with site: and out:
       dir: public
@@ -224,8 +224,8 @@ It fails the job when the check fails (`fail-on-error: "false"` to only report),
 the outputs `verdict`, `errors` and `report`, the path of the JSON report. Every input is
 in [action.yml](action.yml).
 
-- **The molde it runs is the release the action is pinned to** (`@v0.2.0`). Pinned to a
-  commit SHA, set `version: 0.2.0` too; `version: latest` asks for the newest on purpose.
+- **The molde it runs is the release the action is pinned to** (`@v0.3.0`). Pinned to a
+  commit SHA, set `version: 0.3.0` too; `version: latest` asks for the newest on purpose.
 - **The report is treated as the pull request author's text:** everything from it is
   escaped in the comment and the log, so a page title can't post an image, mention
   someone or forge an annotation. The action edits only its own comment, never one
@@ -335,7 +335,7 @@ molde verify DIR --base-url URL        # check any generator's built output
 
 ## Status
 
-molde is at **0.2.0**. It
+molde is at **0.3.0**. It
 builds three sites in production, every day, from their data:
 [proximosdividendos.info](https://proximosdividendos.info) (about 2,900 pages),
 [whichindex.com](https://whichindex.com) (about 12,200) and
