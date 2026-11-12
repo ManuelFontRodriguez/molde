@@ -208,6 +208,20 @@ pub struct SiteConfig {
     /// Under `locales:`: prefix the default locale too (`/es/…`). Default false.
     #[serde(default)]
     pub prefix_default_locale: Option<bool>,
+    /// Under `locales:`: elide the word before a value `t()` inserts, per locale
+    /// (`fr: {}` turns French on; docs/reference.md, Elision). Off when absent.
+    #[serde(default)]
+    pub elision: Option<std::collections::BTreeMap<String, ElisionConfig>>,
+}
+
+/// One site.yaml `elision:` locale: words the spelling can't settle, by how they sound.
+#[derive(Deserialize, Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ElisionConfig {
+    #[serde(default)]
+    pub vowel_sound: Vec<String>,
+    #[serde(default)]
+    pub consonant_sound: Vec<String>,
 }
 
 /// One site.yaml `budgets:` rule. `match` is a glob over build paths (`*` within a
@@ -234,6 +248,8 @@ pub struct Site {
     pub translations: Arc<locales::Translations>,
     /// Unknown `t()` keys met while rendering, for `translations.unknown_key`.
     pub unknown_keys: locales::UnknownKeys,
+    /// "h" values met after an elidable word, for the `elision.undecided` warning.
+    pub elision_undecided: locales::ElisionUndecided,
     // template-engine view of the snapshot, built once — serializing the whole
     // snapshot per page dominates build time at scale
     snapshot_value: OnceLock<minijinja::Value>,
@@ -393,6 +409,7 @@ pub fn load_site(root: &Path) -> Result<Site> {
         config,
         translations,
         unknown_keys: Arc::default(),
+        elision_undecided: Arc::default(),
         snapshot_value: OnceLock::new(),
     })
 }

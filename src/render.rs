@@ -163,6 +163,7 @@ pub(crate) fn filters_env(site: &Site) -> Result<Environment<'static>> {
             &site.config,
             site.translations.clone(),
             site.unknown_keys.clone(),
+            site.elision_undecided.clone(),
         );
     } else if let Some(locale) = &site.config.locale {
         let tag = locale.clone();

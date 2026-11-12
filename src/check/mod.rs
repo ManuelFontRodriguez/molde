@@ -58,7 +58,7 @@ pub fn run_check(site_dir: &Path, out: &Path) -> Result<serde_json::Value> {
         Ok(pages) => pages,
         Err(e) => return Ok(source_failure(&e, Some(&site)).unwrap_or_else(|| config_invalid(&e))),
     };
-    let locale_extras = LocaleExtras::new(&site, &pages);
+    let mut locale_extras = LocaleExtras::new(&site, &pages);
     let dup_errors = routes_layer_errors(&site, &pages);
     if !dup_errors.is_empty() {
         return Ok(locale_extras.add_to(serde_json::json!({
@@ -78,6 +78,12 @@ pub fn run_check(site_dir: &Path, out: &Path) -> Result<serde_json::Value> {
                 .ok_or(e)
         }
     };
+    // render-time findings (`t()` met them while rendering)
+    if let Some(w) = &mut locale_extras.warnings {
+        let mut found = locales::elision_warnings(&site);
+        add_hints(&mut found);
+        w.extend(found);
+    }
     let mut errors = output_layer_errors(&r.build_dir, &site, &pages, &r.unknown_keys)?;
     attach_sources(&mut errors, &site, &pages);
     let pass = errors.is_empty();
@@ -462,6 +468,12 @@ fn hint_for(check: &str) -> Option<&'static str> {
         "translations.unknown_key" => {
             "a template calls t() with a key the default locale's translations file doesn't \
              define (it rendered empty) — fix the key or add it"
+        }
+        "elision.undecided" => {
+            "an elidable word (French \"de\", Italian \"il\"…) met a value starting with \"h\", \
+             and the spelling can't tell a silent h from an aspirated one — it was kept as \
+             written; add the word to site.yaml elision.<locale>.vowel_sound (it elides) or \
+             consonant_sound (it doesn't). A warning: the build still publishes"
         }
         "i18n.sparse_locale" => {
             "this locale has fewer than half the default locale's pages for the route — a \

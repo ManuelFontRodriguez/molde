@@ -24,6 +24,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 /// of aborting the render, so every other layer still runs.
 pub type UnknownKeys = Arc<Mutex<BTreeSet<(String, String, String)>>>;
 
+/// "h" values met after an elidable word while rendering: (locale, word) -> the
+/// templates that met them. Reported as the `elision.undecided` warning.
+pub type ElisionUndecided = Arc<Mutex<BTreeMap<(String, String), BTreeSet<String>>>>;
+
 /// `pt-BR` -> `pt-br`: a tag's URL prefix.
 pub fn prefix(tag: &str) -> String {
     tag.to_ascii_lowercase()
@@ -58,8 +62,26 @@ pub fn validate_config(config: &SiteConfig) -> Result<()> {
         if config.prefix_default_locale.is_some() {
             bail!("site.yaml: `prefix_default_locale` needs `locales:` — remove it or add locales");
         }
+        if config.elision.is_some() {
+            bail!("site.yaml: `elision` needs `locales:` — remove it or add locales");
+        }
         return Ok(());
     };
+    for (tag, e) in config.elision.iter().flatten() {
+        if let Some(w) = e.vowel_sound.iter().find(|w| e.consonant_sound.contains(w)) {
+            bail!("site.yaml elision.{tag}: {w:?} is in both vowel_sound and consonant_sound");
+        }
+        if !tags.contains(tag) {
+            bail!("site.yaml elision: {tag:?} isn't in site.yaml locales {tags:?}");
+        }
+        if !crate::i18n::elision::supported(tag) {
+            bail!(
+                "site.yaml elision: molde has no elision rules for {tag:?} — it has them for \
+                 {:?}",
+                crate::i18n::elision::LANGUAGES
+            );
+        }
+    }
     if config.locale.is_some() {
         bail!(
             "site.yaml: `locale` and `locales` can't both be set — `locale` is for \
@@ -606,15 +628,95 @@ pub(crate) fn num_format_filter(
     Ok(i18n::num_format(loc, &text, opts))
 }
 
+/// Per-locale elision rules from site.yaml `elision:` (language subtag, exceptions).
+type ElisionRules = BTreeMap<String, (String, i18n::elision::Exceptions)>;
+
+fn elision_rules(config: &SiteConfig) -> ElisionRules {
+    config
+        .elision
+        .iter()
+        .flatten()
+        .map(|(tag, c)| {
+            let ex = i18n::elision::Exceptions {
+                vowel_sound: c.vowel_sound.clone(),
+                consonant_sound: c.consonant_sound.clone(),
+            };
+            (tag.clone(), (i18n::elision::language(tag).to_string(), ex))
+        })
+        .collect()
+}
+
+/// One `t()` argument: as written into the output, its text for the elision test, and
+/// whether it is markup (a safe `t_html` argument, whose leading tags are skipped).
+struct Arg {
+    written: String,
+    plain: String,
+    markup: bool,
+}
+
+/// Fills `text`'s `{placeholders}` in one pass (a value is never scanned for
+/// placeholders again); a placeholder without an argument stays literal. With the
+/// locale's elision on, the translation's word right before a value elides when the
+/// value starts with a vowel sound ("de " + "Aperam" -> "d'Aperam"). Only the
+/// translation's own text can change, never an earlier value; an undecided "h" value is
+/// recorded with the template instead.
+fn interpolate(
+    text: &str,
+    args: &BTreeMap<String, Arg>,
+    at: (&str, &str),
+    rules: &ElisionRules,
+    undecided: &ElisionUndecided,
+) -> String {
+    let (locale, template) = at;
+    let elide = rules.get(locale);
+    let mut out = String::with_capacity(text.len() + 32);
+    let mut last = 0;
+    for c in placeholder_re().captures_iter(text) {
+        let m = c.get(0).unwrap();
+        // where the translation's text before this placeholder begins in `out`
+        let literal = out.len();
+        out.push_str(&text[last..m.start()]);
+        last = m.end();
+        let Some(arg) = args.get(&c[1]) else {
+            out.push_str(m.as_str());
+            continue;
+        };
+        if let Some((lang, ex)) = elide {
+            use i18n::elision::{join, leading_text, Join};
+            let value = leading_text(&arg.plain, arg.markup);
+            match join(lang, &out, &value, ex) {
+                Join::Elide { cut, word } if cut >= literal => {
+                    out.truncate(cut);
+                    out.push_str(&word);
+                }
+                Join::Undecided(w) => {
+                    undecided
+                        .lock()
+                        .unwrap()
+                        .entry((locale.to_string(), w))
+                        .or_default()
+                        .insert(template.to_string());
+                }
+                _ => {}
+            }
+        }
+        out.push_str(&arg.written);
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
 /// Registers `t`, `t_html`, `loc` and the per-page-locale `date_format` / `num_format`.
 pub fn register(
     env: &mut minijinja::Environment<'static>,
     config: &SiteConfig,
     translations: Arc<Translations>,
     unknown: UnknownKeys,
+    undecided: ElisionUndecided,
 ) {
     let tags: Vec<String> = config.locale_tags().unwrap_or_default().to_vec();
     let default = config.default_locale().unwrap_or_default().to_string();
+    let rules = Arc::new(elision_rules(config));
 
     // `html`: t_html, whose result is marked safe — its arguments are escaped, so only
     // the translation's own markup is unescaped
@@ -670,23 +772,33 @@ pub fn register(
             if let Some(l) = v.downcast_object_ref::<Localized>() {
                 return Err(print_error(l));
             }
-            let text = match html && !v.is_safe() {
-                true => crate::check::html::attr_escape(&v.to_string()),
-                false => v.to_string(),
+            let plain = v.to_string();
+            let written = match html && !v.is_safe() {
+                true => crate::check::html::attr_escape(&plain),
+                false => plain.clone(),
             };
-            args.insert(name, text);
+            let markup = html && v.is_safe();
+            args.insert(
+                name,
+                Arg {
+                    written,
+                    plain,
+                    markup,
+                },
+            );
         }
         kwargs.assert_all_used()?;
         // absent in this locale: renders empty, `translations.missing` reports it
         let Some(text) = translations.by_locale.get(&locale).and_then(|m| m.get(key)) else {
             return Ok(String::new());
         };
-        // one pass: an argument's value is never scanned for placeholders again
-        Ok(placeholder_re()
-            .replace_all(text, |c: &regex::Captures| {
-                args.get(&c[1]).cloned().unwrap_or_else(|| c[0].to_string())
-            })
-            .into_owned())
+        Ok(interpolate(
+            text,
+            &args,
+            (&locale, state.name()),
+            &rules,
+            &undecided,
+        ))
     };
     let t = Arc::new(translate);
     let t1 = t.clone();
@@ -1010,6 +1122,29 @@ fn pattern_source(site: &Site, template: &str) -> Option<String> {
     let idx: usize = idx.parse().ok()?;
     let route = site.routes.routes.get(idx)?;
     Some(format!("routes.yaml route {idx} ({}) {kind}", route.path))
+}
+
+/// `elision.undecided`: values starting with "h" that met an elidable word, one warning
+/// per locale and word. Kept as written (no elision) until site.yaml decides.
+pub fn elision_warnings(site: &Site) -> Vec<serde_json::Value> {
+    site.elision_undecided
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|((locale, word), templates)| {
+            serde_json::json!({
+                "layer": "translations",
+                "check": "elision.undecided",
+                "locale": locale,
+                "word": word,
+                // a route pattern (title, description) reads as its routes.yaml source
+                "templates": templates
+                    .iter()
+                    .map(|t| pattern_source(site, t).unwrap_or_else(|| t.clone()))
+                    .collect::<Vec<_>>(),
+            })
+        })
+        .collect()
 }
 
 /// Page counts per locale for one route, keyed by locale (`list_routes`, the sparse

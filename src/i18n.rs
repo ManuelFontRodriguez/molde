@@ -20,6 +20,7 @@
 
 #[rustfmt::skip]
 mod cldr_data;
+pub mod elision;
 
 pub use cldr_data::CLDR_VERSION;
 
