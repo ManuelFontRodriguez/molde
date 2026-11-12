@@ -5,7 +5,10 @@ report) is listed here under the release that makes it, with what to do. What ea
 of release may change is in the reference's
 [compatibility](docs/reference.md#compatibility) section.
 
-## Unreleased
+## 0.3.0 — 2026-11-12
+
+French and Italian elision where `t()` inserts a value. Since 0.2.0:
+
 
 - `elision:` in site.yaml: French and Italian elision where `t()` / `t_html()` insert a
   value (`de` + `Aperam` → `d'Aperam`, `il` + `87` → `l'87`). Only the word right before
